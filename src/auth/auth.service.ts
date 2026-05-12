@@ -18,7 +18,7 @@ export class AuthService {
       throw new UnauthorizedException('Email hoặc mật khẩu không đúng.');
     }
 
-    const payload = { sub: user._id, email: user.email };
+    const payload = { _id: user._id, email: user.email };
     return {
       // 💡 Here the JWT secret key that's used for signing the payload 
       // is the key that was passed in the JwtModule
