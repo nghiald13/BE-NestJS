@@ -1,9 +1,9 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { User } from './schemas/user.schema';
-import { Model } from 'mongoose';
+import { isValidObjectId, Model } from 'mongoose';
 import { hashPasswordHelper } from '../../helpers/utilities';
 import aqp from 'api-query-params';
 
@@ -71,11 +71,23 @@ export class UsersService {
     return `This action returns a #${id} user`;
   }
 
-  update(id: number, updateUserDto: UpdateUserDto) {
-    return `This action updates a #${id} user`;
+  async update(updateUserDto: UpdateUserDto) {
+    const result = await this.userModel.updateOne(
+      {_id: updateUserDto._id},
+      {...updateUserDto}
+    )
+    return result;
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} user`;
+  //Remove a user WITHOUT making new DeleteUserDto
+  async remove(_id: string) {
+    //Check whether _id is valid MongoDB Object Id
+    if (isValidObjectId(_id)) {
+      //Process to delete
+      return await this.userModel.deleteOne({_id})
+    } else {
+      //Handling Exception
+      throw new BadGatewayException('_id không hợp lệ')
+    }
   }
 }
