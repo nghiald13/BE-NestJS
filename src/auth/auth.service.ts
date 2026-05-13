@@ -11,14 +11,15 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  async signIn(email: string, pass: string): Promise<any> {
-    const user = await this.usersService.findByEmail(email);
+  async validateUser(username: string, pass: string): Promise<any> {
+    const user = await this.usersService.findByEmail(username);
     const isPasswordMatched = await cmpPassword(pass, user.password)
-    if (!isPasswordMatched) {
-      throw new UnauthorizedException('Email hoặc mật khẩu không đúng.');
-    }
+    if (!user || !isPasswordMatched) return null
+    return user
+  }
 
-    const payload = { _id: user._id, email: user.email };
+  async signIn(user: any) {
+    const payload = { sub: user._id, username: user.email };
     return {
       // 💡 Here the JWT secret key that's used for signing the payload 
       // is the key that was passed in the JwtModule
