@@ -3,20 +3,24 @@ import { Body, Controller, Post, HttpCode, HttpStatus, UseGuards, Request, Get }
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './passport/local-auth.guard';
 import { JwtAuthGuard } from './passport/jwt-auth.guard';
+import { Public } from '../decorators/decor';
+import { CreateAuthDto } from './dto/create-auth.dto';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('signin')
+  @Public()
   @UseGuards(LocalAuthGuard)
   signIn(@Request() req) {
     return this.authService.signIn(req.user);
   }
 
+  @Public()
   @UseGuards(JwtAuthGuard)
-  @Get('profile')
-  getProfile(@Request() req) {
-    return req.user;
+  @Post('signup')
+  signUp(@Body() signUpDto: CreateAuthDto) {
+    return this.authService.signUp(signUpDto);
   }
 }

@@ -6,6 +6,9 @@ import { User } from './schemas/user.schema';
 import { isValidObjectId, Model } from 'mongoose';
 import { hashPasswordHelper } from '../../helpers/utilities';
 import aqp from 'api-query-params';
+import { CreateAuthDto } from '../../auth/dto/create-auth.dto';
+import { v4 as uuidv4 } from "uuid";
+import dayjs from 'dayjs';
 
 @Injectable()
 export class UsersService {
@@ -43,6 +46,35 @@ export class UsersService {
     return {
       _id: user._id
     };
+  }
+
+  async signUp(signUpDto: CreateAuthDto) {
+    const {name, email, password} = signUpDto
+
+    //check email
+    const isEmailExist = await this.isEmailExist(email)
+    if (isEmailExist) {
+      throw new BadRequestException(`${email} đã được đăng ký. Quên mật khẩu?`)
+    }
+
+    //hash password
+    const hashPassword = await hashPasswordHelper(password)
+    const user = await this.userModel.create({
+      name,
+      email,
+      password: hashPassword,
+      isActive: false,
+      codeId: uuidv4(),
+      codeExpired: dayjs().add(1, 'minute'),
+    })
+
+    //response
+    return {
+      _id: user._id
+    };
+
+    //send verification email
+
   }
 
   async findAll(query: string, current: number, pageSize: number) {
