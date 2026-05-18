@@ -3,7 +3,7 @@ import { Body, Controller, Post, HttpCode, HttpStatus, UseGuards, Request, Get }
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './passport/local-auth.guard';
 import { JwtAuthGuard } from './passport/jwt-auth.guard';
-import { Public } from '../decorators/decor';
+import { Public, ResponseMessage } from '../decorators/decor';
 import { CreateAuthDto } from './dto/create-auth.dto';
 
 @Controller('auth')
@@ -13,6 +13,7 @@ export class AuthController {
   @Post('signin')
   @Public()
   @UseGuards(LocalAuthGuard)
+  @ResponseMessage("Fetch SignIn")
   signIn(@Request() req) {
     return this.authService.signIn(req.user);
   }

@@ -9,12 +9,14 @@ import aqp from 'api-query-params';
 import { CreateAuthDto } from '../../auth/dto/create-auth.dto';
 import { v4 as uuidv4 } from "uuid";
 import dayjs from 'dayjs';
+import { MailerService } from '@nestjs-modules/mailer';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectModel(User.name)
-    private userModel: Model<User>
+    private userModel: Model<User>,
+    private readonly mailerService: MailerService,
   ) {}
 
   isEmailExist = async(email: string) => {
@@ -59,21 +61,35 @@ export class UsersService {
 
     //hash password
     const hashPassword = await hashPasswordHelper(password)
+    const codeId = uuidv4()
     const user = await this.userModel.create({
       name,
       email,
       password: hashPassword,
       isActive: false,
-      codeId: uuidv4(),
-      codeExpired: dayjs().add(1, 'minute'),
+      codeId: codeId,
+      codeExpired: dayjs().add(5, 'minutes'),
     })
+
+    //send verification email
+    try {
+      await this.mailerService.sendMail({
+        to: email,
+        subject: 'Verify your email to activate account @Fullstack',
+        template: 'register',
+        context: {
+          name: user?.name ?? user.email,
+          activationCode: codeId
+        },
+      })
+    } catch (error) {
+        throw new BadRequestException(error)
+    }
 
     //response
     return {
       _id: user._id
     };
-
-    //send verification email
 
   }
 
