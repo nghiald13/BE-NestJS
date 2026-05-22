@@ -22,6 +22,4 @@ export class CreateUserDto {
     address: string;
     image: string;
     codeSecret: string;
-    codeId: string;
-    codeExpired: string;
 }

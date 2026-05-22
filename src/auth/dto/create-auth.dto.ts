@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsStrongPassword, MinLength } from "class-validator";
+import { IsEmail, IsNotEmpty, IsStrongPassword } from "class-validator";
 
 export class CreateAuthDto {
     @IsNotEmpty()
@@ -12,7 +12,7 @@ export class CreateAuthDto {
         minNumbers: 1,
         minSymbols: 1,
         minUppercase: 1
-    }, {message: "Mật khẩu không đủ mạnh"})
+    }, { message: "Mật khẩu không đủ mạnh" })
     password: string
 
     @IsNotEmpty()

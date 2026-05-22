@@ -7,10 +7,9 @@ import { isValidObjectId, Model } from 'mongoose';
 import { hashPasswordHelper } from '../../helpers/utilities';
 import aqp from 'api-query-params';
 import { CreateAuthDto } from '../../auth/dto/create-auth.dto';
-import { v4 as uuidv4 } from "uuid";
-import dayjs from 'dayjs';
 import { MailerService } from '@nestjs-modules/mailer';
-import { generate, generateSecret, verify } from 'otplib';
+import { generate, generateSecret, OTP, verify } from 'otplib';
+import { VerifyAuthDto } from '../../auth/dto/update-auth.dto';
 
 @Injectable()
 export class UsersService {
@@ -62,24 +61,26 @@ export class UsersService {
 
     //hash password
     const hashPassword = await hashPasswordHelper(password)
+
+    //generate OTPSecret
     const codeSecret = generateSecret()
-    const codeId = await generate({
-      secret: codeSecret,
-      counter: 0,
-      digits: 6,
-    })
+
+    //Create User
     const user = await this.userModel.create({
       name,
       email,
       password: hashPassword,
       isActive: false,
       codeSecret: codeSecret,
-      codeId: codeId,
-      codeExpired: dayjs().add(5, 'minutes'),
     })
 
     //send verification email
     try {
+      //Generate OTP 6 digits
+      const codeId = await generate({
+        secret: codeSecret,
+      })
+
       await this.mailerService.sendMail({
         to: email,
         subject: 'Verify your email to activate account @Fullstack',
@@ -100,10 +101,23 @@ export class UsersService {
 
   }
 
-  async verifyAccount(updateUserDto: UpdateUserDto) {
-    // const isVerified = await verify({
-    //   secret:
-    // })
+  async verifyAccount(verifyAuthDto: VerifyAuthDto) {
+    try {
+      const user = await this.userModel.findOne({
+        email: verifyAuthDto.email
+      })
+
+      if (!user) throw new BadRequestException();
+      const result = await verify({
+        secret: user.codeSecret,
+        token: verifyAuthDto.codeId,
+        epochTolerance: 150
+      })
+      return result.valid
+    } catch (error) {
+      return false
+    }
+
   }
 
   async findAll(query: string, current: number, pageSize: number) {

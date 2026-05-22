@@ -5,7 +5,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) { }
 
   @Post()
   create(@Body() createUserDto: CreateUserDto) {
@@ -34,10 +34,5 @@ export class UsersController {
   @Delete(':id')
   async delete(@Param('id') id: string) {
     return this.usersService.remove(id);
-  }
-
-  @Post(':id')
-  async verify(@Body() updateUserDto: UpdateUserDto) {
-    return this.usersService.verifyAccount(updateUserDto)
   }
 }

@@ -5,10 +5,11 @@ import { LocalAuthGuard } from './passport/local-auth.guard';
 import { JwtAuthGuard } from './passport/jwt-auth.guard';
 import { Public, ResponseMessage } from '../decorators/decor';
 import { CreateAuthDto } from './dto/create-auth.dto';
+import { VerifyAuthDto } from './dto/update-auth.dto';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   @Post('signin')
   @Public()
@@ -23,5 +24,11 @@ export class AuthController {
   @Post('signup')
   signUp(@Body() signUpDto: CreateAuthDto) {
     return this.authService.signUp(signUpDto);
+  }
+
+  @Public()
+  @Post('verify')
+  verify(@Body() verifyAuthDto: VerifyAuthDto) {
+    return this.authService.verify(verifyAuthDto);
   }
 }

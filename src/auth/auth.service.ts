@@ -4,6 +4,7 @@ import { UsersService } from '../modules/users/users.service';
 import { cmpPassword } from '../helpers/utilities';
 import { JwtService } from '@nestjs/jwt';
 import { CreateAuthDto } from './dto/create-auth.dto';
+import { VerifyAuthDto } from './dto/update-auth.dto';
 
 @Injectable()
 export class AuthService {
@@ -40,5 +41,9 @@ export class AuthService {
 
   signUp = async (signUpDto: CreateAuthDto) => {
     return await this.usersService.signUp(signUpDto)
+  }
+
+  verify = async (verifyAuthDto: VerifyAuthDto) => {
+    return await this.usersService.verifyAccount(verifyAuthDto)
   }
 }
