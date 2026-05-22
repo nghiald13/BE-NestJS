@@ -35,4 +35,9 @@ export class UsersController {
   async delete(@Param('id') id: string) {
     return this.usersService.remove(id);
   }
+
+  @Post(':id')
+  async verify(@Body() updateUserDto: UpdateUserDto) {
+    return this.usersService.verifyAccount(updateUserDto)
+  }
 }

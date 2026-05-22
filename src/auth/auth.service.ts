@@ -10,13 +10,17 @@ export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
-  ) {}
+  ) { }
 
   async validateUser(username: string, pass: string): Promise<any> {
-    const user = await this.usersService.findByEmail(username);
-    const isPasswordMatched = await cmpPassword(pass, user.password)
-    if (!user || !isPasswordMatched) return null
-    return user
+    try {
+      const user = await this.usersService.findByEmail(username);
+      const isPasswordMatched = await cmpPassword(pass, user.password)
+      if (!isPasswordMatched) throw new Error
+      return user
+    } catch (error) { // If it goes here, either email or password wrong
+      return null
+    }
   }
 
   async signIn(user: any) {
@@ -34,7 +38,7 @@ export class AuthService {
     }
   }
 
-  signUp = async(signUpDto: CreateAuthDto) => {
+  signUp = async (signUpDto: CreateAuthDto) => {
     return await this.usersService.signUp(signUpDto)
   }
 }

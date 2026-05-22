@@ -14,7 +14,7 @@ async function bootstrap() {
     forbidNonWhitelisted: true,
   }))
 
-  app.setGlobalPrefix('v1/api', {exclude: [
+  app.setGlobalPrefix('api/v1', {exclude: [
     '', 
   ]});
 

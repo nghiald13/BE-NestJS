@@ -1,4 +1,4 @@
-const bcrypt = require('bcrypt') 
+const bcrypt = require('bcrypt')
 const saltRounds = 10;
 
 export const hashPasswordHelper = async (plainPassword: string) => {
@@ -16,4 +16,8 @@ export const cmpPassword = async (plainPassword: string, hashPassword) => {
     } catch (error) {
         console.log(error)
     }
+}
+
+export const genOTP = async (length: number) => {
+
 }

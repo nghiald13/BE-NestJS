@@ -10,6 +10,7 @@ import { CreateAuthDto } from '../../auth/dto/create-auth.dto';
 import { v4 as uuidv4 } from "uuid";
 import dayjs from 'dayjs';
 import { MailerService } from '@nestjs-modules/mailer';
+import { generate, generateSecret, verify } from 'otplib';
 
 @Injectable()
 export class UsersService {
@@ -17,16 +18,16 @@ export class UsersService {
     @InjectModel(User.name)
     private userModel: Model<User>,
     private readonly mailerService: MailerService,
-  ) {}
+  ) { }
 
-  isEmailExist = async(email: string) => {
-    const user = await this.userModel.exists({email: email})
+  isEmailExist = async (email: string) => {
+    const user = await this.userModel.exists({ email: email })
     if (user) return true
     return false
   }
 
   async create(createUserDto: CreateUserDto) {
-    const {name, email, password, phone, address, image} = createUserDto
+    const { name, email, password, phone, address, image } = createUserDto
 
     //check email
     const isEmailExist = await this.isEmailExist(email)
@@ -51,7 +52,7 @@ export class UsersService {
   }
 
   async signUp(signUpDto: CreateAuthDto) {
-    const {name, email, password} = signUpDto
+    const { name, email, password } = signUpDto
 
     //check email
     const isEmailExist = await this.isEmailExist(email)
@@ -61,12 +62,18 @@ export class UsersService {
 
     //hash password
     const hashPassword = await hashPasswordHelper(password)
-    const codeId = uuidv4()
+    const codeSecret = generateSecret()
+    const codeId = await generate({
+      secret: codeSecret,
+      counter: 0,
+      digits: 6,
+    })
     const user = await this.userModel.create({
       name,
       email,
       password: hashPassword,
       isActive: false,
+      codeSecret: codeSecret,
       codeId: codeId,
       codeExpired: dayjs().add(5, 'minutes'),
     })
@@ -83,7 +90,7 @@ export class UsersService {
         },
       })
     } catch (error) {
-        throw new BadRequestException(error)
+      throw new BadRequestException(error)
     }
 
     //response
@@ -93,8 +100,14 @@ export class UsersService {
 
   }
 
+  async verifyAccount(updateUserDto: UpdateUserDto) {
+    // const isVerified = await verify({
+    //   secret:
+    // })
+  }
+
   async findAll(query: string, current: number, pageSize: number) {
-    const {filter, limit, skip, sort} = aqp(query)
+    const { filter, limit, skip, sort } = aqp(query)
     //As AQP Docs filter doesn't have current&pageSize params
     if (filter.current) delete filter.current
     if (filter.pageSize) delete filter.pageSize
@@ -106,13 +119,13 @@ export class UsersService {
     const offset = (current - 1) * pageSize
 
     const results = await this.userModel
-    .find(filter)
-    .limit(pageSize)
-    .skip(offset)
-    .sort(sort as any)
-    .select("-password") //which means to select every fields EXCEPT password
+      .find(filter)
+      .limit(pageSize)
+      .skip(offset)
+      .sort(sort as any)
+      .select("-password") //which means to select every fields EXCEPT password
 
-    return {results, totalPages};
+    return { results, totalPages };
   }
 
   findOne(id: number) {
@@ -120,13 +133,13 @@ export class UsersService {
   }
 
   async findByEmail(email: string) {
-    return await this.userModel.findOne({email})
+    return await this.userModel.findOne({ email })
   }
 
   async update(updateUserDto: UpdateUserDto) {
     const result = await this.userModel.updateOne(
-      {_id: updateUserDto._id},
-      {...updateUserDto}
+      { _id: updateUserDto._id },
+      { ...updateUserDto }
     )
     return result;
   }
@@ -136,7 +149,7 @@ export class UsersService {
     //Check whether _id is valid MongoDB Object Id
     if (isValidObjectId(_id)) {
       //Process to delete
-      return await this.userModel.deleteOne({_id})
+      return await this.userModel.deleteOne({ _id })
     } else {
       //Handling Exception
       throw new BadGatewayException('_id không hợp lệ')
