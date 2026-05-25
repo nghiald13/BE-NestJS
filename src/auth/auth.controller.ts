@@ -31,4 +31,10 @@ export class AuthController {
   verify(@Body() verifyAuthDto: VerifyAuthDto) {
     return this.authService.verify(verifyAuthDto);
   }
+
+  @Public()
+  @Post('sendEmail')
+  sendEmail(@Body() obj: any) {
+    return this.authService.sendEmail(obj.email)
+  }
 }

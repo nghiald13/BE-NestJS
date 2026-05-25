@@ -8,7 +8,7 @@ import { hashPasswordHelper } from '../../helpers/utilities';
 import aqp from 'api-query-params';
 import { CreateAuthDto } from '../../auth/dto/create-auth.dto';
 import { MailerService } from '@nestjs-modules/mailer';
-import { generate, generateSecret, OTP, verify } from 'otplib';
+import { generate, generateSecret, verify } from 'otplib';
 import { VerifyAuthDto } from '../../auth/dto/update-auth.dto';
 
 @Injectable()
@@ -75,24 +75,7 @@ export class UsersService {
     })
 
     //send verification email
-    try {
-      //Generate OTP 6 digits
-      const codeId = await generate({
-        secret: codeSecret,
-      })
-
-      await this.mailerService.sendMail({
-        to: email,
-        subject: 'Verify your email to activate account @Fullstack',
-        template: 'register',
-        context: {
-          name: user?.name ?? user.email,
-          activationCode: codeId
-        },
-      })
-    } catch (error) {
-      throw new BadRequestException(error)
-    }
+    this.sendVerificationEmail(user.email)
 
     //response
     return {
@@ -108,16 +91,54 @@ export class UsersService {
       })
 
       if (!user) throw new BadRequestException();
+
       const result = await verify({
         secret: user.codeSecret,
         token: verifyAuthDto.codeId,
         epochTolerance: 150
       })
-      return result.valid
+
+      if (result.valid) {
+        await user.updateOne({
+          isActive: true
+        })
+        return true
+      }
+      return false
     } catch (error) {
       return false
     }
 
+  }
+
+  async sendVerificationEmail(email: string) {
+    const user = await this.userModel.findOne({
+      email
+    })
+    if (!user) throw new BadRequestException()
+
+    try {
+      //Generate OTP 6 digits
+      const codeId = await generate({
+        secret: user.codeSecret,
+      })
+
+      await this.mailerService.sendMail({
+        to: email,
+        subject: 'Verify your email to activate account @Fullstack',
+        template: 'register',
+        context: {
+          name: user?.name ?? user.email,
+          activationCode: codeId
+        },
+      })
+    } catch (error) {
+      throw new BadRequestException(error)
+    }
+
+    return {
+      isSent: true
+    }
   }
 
   async findAll(query: string, current: number, pageSize: number) {

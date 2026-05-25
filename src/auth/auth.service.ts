@@ -46,4 +46,8 @@ export class AuthService {
   verify = async (verifyAuthDto: VerifyAuthDto) => {
     return await this.usersService.verifyAccount(verifyAuthDto)
   }
+
+  sendEmail = async (email: string) => {
+    return await this.usersService.sendVerificationEmail(email)
+  }
 }
