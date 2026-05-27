@@ -74,9 +74,6 @@ export class UsersService {
       codeSecret: codeSecret,
     })
 
-    //send verification email
-    this.sendVerificationEmail(user.email)
-
     //response
     return {
       _id: user._id
@@ -86,10 +83,7 @@ export class UsersService {
 
   async verifyAccount(verifyAuthDto: VerifyAuthDto) {
     try {
-      const user = await this.userModel.findOne({
-        email: verifyAuthDto.email
-      })
-
+      const user = await this.userModel.findById(verifyAuthDto._id)
       if (!user) throw new BadRequestException();
 
       const result = await verify({
@@ -111,10 +105,8 @@ export class UsersService {
 
   }
 
-  async sendVerificationEmail(email: string) {
-    const user = await this.userModel.findOne({
-      email
-    })
+  async sendVerificationEmail(_id: string) {
+    const user = await this.userModel.findById(_id)
     if (!user) throw new BadRequestException()
 
     try {
@@ -124,7 +116,7 @@ export class UsersService {
       })
 
       await this.mailerService.sendMail({
-        to: email,
+        to: user.email,
         subject: 'Verify your email to activate account @Fullstack',
         template: 'register',
         context: {
@@ -143,9 +135,11 @@ export class UsersService {
 
   async findAll(query: string, current: number, pageSize: number) {
     const { filter, limit, skip, sort } = aqp(query)
+
     //As AQP Docs filter doesn't have current&pageSize params
     if (filter.current) delete filter.current
     if (filter.pageSize) delete filter.pageSize
+
     //Pagination
     if (!current) current = 1
     if (!pageSize) pageSize = 1
@@ -158,13 +152,9 @@ export class UsersService {
       .limit(pageSize)
       .skip(offset)
       .sort(sort as any)
-      .select("-password") //which means to select every fields EXCEPT password
+      .select("-password -codeSecret") //which means to select every fields EXCEPT password
 
     return { results, totalPages };
-  }
-
-  findOne(id: number) {
-    return `This action returns a #${id} user`;
   }
 
   async findByEmail(email: string) {

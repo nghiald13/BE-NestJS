@@ -35,6 +35,6 @@ export class AuthController {
   @Public()
   @Post('sendEmail')
   sendEmail(@Body() obj: any) {
-    return this.authService.sendEmail(obj.email)
+    return this.authService.sendEmail(obj._id)
   }
 }

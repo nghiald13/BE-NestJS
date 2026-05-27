@@ -10,6 +10,7 @@ import { JwtAuthGuard } from './auth/passport/jwt-auth.guard';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/adapters/handlebars.adapter';
 import { TransformInterceptor } from './core/transform.interceptor';
+import { ProductsModule } from './modules/products/products.module';
 
 @Module({
   imports: [
@@ -49,6 +50,8 @@ import { TransformInterceptor } from './core/transform.interceptor';
         },
       }),
     }),
+
+    ProductsModule,
     
   ],
   controllers: [AppController],

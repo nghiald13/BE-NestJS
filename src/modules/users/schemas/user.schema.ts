@@ -35,13 +35,6 @@ export class User {
 
   @Prop()
   codeSecret: string;
-
-  @Prop()
-  codeId: string;
-
-  @Prop()
-  codeExpired: string;
-
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
