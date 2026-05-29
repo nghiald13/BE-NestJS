@@ -1,9 +1,9 @@
 import { BadGatewayException, BadRequestException, Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { InjectModel } from '@nestjs/mongoose';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { User } from './schemas/user.schema';
-import { isValidObjectId, Model } from 'mongoose';
+import { Connection, isValidObjectId, Model } from 'mongoose';
 import { hashPasswordHelper } from '../../helpers/utilities';
 import aqp from 'api-query-params';
 import { CreateAuthDto } from '../../auth/dto/create-auth.dto';
@@ -14,6 +14,7 @@ import { VerifyAuthDto } from '../../auth/dto/update-auth.dto';
 @Injectable()
 export class UsersService {
   constructor(
+    @InjectConnection() private readonly connection: Connection,
     @InjectModel(User.name)
     private userModel: Model<User>,
     private readonly mailerService: MailerService,
@@ -134,16 +135,29 @@ export class UsersService {
   }
 
   async findAll(query: string, current: number, pageSize: number) {
-    const { filter, limit, skip, sort } = aqp(query)
+    const { filter, limit, skip, sort } = aqp(query, {
+      whitelist: ['kw']
+    })
 
-    //As AQP Docs filter doesn't have current&pageSize params
-    if (filter.current) delete filter.current
-    if (filter.pageSize) delete filter.pageSize
+    const kw = filter.kw && typeof filter.kw !== 'object' ? String(filter.kw).trim() : ''
+    delete filter.kw
+    if (kw !== '') {
+      const regexSearch = {
+        $regex: kw,
+        $options: 'i'
+      }
+
+      filter.$or = [
+        { name: regexSearch },
+        { email: regexSearch },
+      ]
+
+    }
 
     //Pagination
     if (!current) current = 1
-    if (!pageSize) pageSize = 1
-    const totalItems = (await (this.userModel.find(filter))).length
+    if (!pageSize) pageSize = 25
+    const totalItems = await this.userModel.countDocuments(filter)
     const totalPages = Math.ceil(totalItems / pageSize)
     const offset = (current - 1) * pageSize
 
@@ -153,8 +167,15 @@ export class UsersService {
       .skip(offset)
       .sort(sort as any)
       .select("-password -codeSecret") //which means to select every fields EXCEPT password
+      .lean() // query faster for read-only purpose
 
-    return { results, totalPages };
+    return {
+      results,
+      meta: {
+        "totalItems": totalItems,
+        "totalPages": totalPages
+      }
+    };
   }
 
   async findByEmail(email: string) {
@@ -177,7 +198,7 @@ export class UsersService {
       return await this.userModel.deleteOne({ _id })
     } else {
       //Handling Exception
-      throw new BadGatewayException('_id không hợp lệ')
+      throw new BadGatewayException('Invalid Object id')
     }
   }
 }

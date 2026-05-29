@@ -25,7 +25,7 @@ export class AuthService {
   }
 
   async signIn(user: any) {
-    const payload = { sub: user._id, username: user.email };
+    const payload = { sub: user._id, username: user.email, role: user.role };
     return {
       // 💡 Here the JWT secret key that's used for signing the payload 
       // is the key that was passed in the JwtModule
@@ -33,6 +33,7 @@ export class AuthService {
         _id: user._id,
         email: user.email,
         name: user.name,
+        role: user.role,
         isActive: user.isActive,
       },
       access_token: await this.jwtService.signAsync(payload),

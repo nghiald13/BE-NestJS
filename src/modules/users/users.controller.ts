@@ -1,7 +1,10 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { Roles } from '../../decorators/decor';
+import { Role } from '../../auth/roles.enum';
+import { RolesGuard } from '../../auth/passport/roles-auth.guard';
 
 @Controller('users')
 export class UsersController {
@@ -13,6 +16,8 @@ export class UsersController {
   }
 
   @Get()
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
   async findAll(
     @Query() query: string,
     @Query('current') current: string,

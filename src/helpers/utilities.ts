@@ -17,7 +17,3 @@ export const cmpPassword = async (plainPassword: string, hashPassword) => {
         console.log(error)
     }
 }
-
-export const genOTP = async (length: number) => {
-
-}
