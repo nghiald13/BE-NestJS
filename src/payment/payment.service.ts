@@ -1,6 +1,6 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { ForbiddenException, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { CreatePaymentDto } from './dto/create-payment.dto';
-import { UpdatePaymentDto } from './dto/update-payment.dto';
+import { MomoPaymentDto, UpdatePaymentDto } from './dto/update-payment.dto';
 import { firstValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
 import * as crypto from 'crypto';
@@ -19,24 +19,27 @@ export class PaymentService {
   }
 
   async create(createPaymentDto: CreatePaymentDto) {
+
     const endpoint = process.env.MOMO_TEST_ENV_URL
     const momoPartnerCode = process.env.MOMO_PARTNER_CODE
     const momoAccessKey = process.env.MOMO_ACCESS_KEY
     const momoSecretKey = process.env.MOMO_SECRET_KEY
 
+    const orderId = `ORD_${Date.now()}`
+    const requestId = `REQ_${Date.now()}`
+
     const requestBody = {
       accessKey: momoAccessKey,
       amount: +createPaymentDto.amount,
-      extraData: '',
-      ipnUrl: 'https://your-api.com/v1/payment/momo-webhook', // Link NestJS nhận kết quả ngầm từ MoMo
-      orderId: `ORD_${Date.now()}`,
-      orderInfo: 'thanhtoandonhang',
+      extraData: "",
+      ipnUrl: `${process.env.NGROK_HOOK}/api/v1/payment/checkout`,
+      orderId: orderId,
+      orderInfo: "thanhtoandonhang",
       partnerCode: momoPartnerCode,
-      redirectUrl: 'http://localhost:3000/checkout', // Link quay lại Next.js sau khi thanh toán xong
-      requestId: `REQ_${Date.now()}`,
-      requestType: 'captureWallet',
-      // signature: '', Được tính từ SecretKey
-    };
+      redirectUrl: `${process.env.FRONT_END_BASE_URL}${process.env.FRONT_END_CHECKOUT}`, // Link quay lại Next.js sau khi thanh toán xong
+      requestId: requestId,
+      requestType: "captureWallet"
+    }
 
 
     const signature = this.generateMoMoSignature(queryString.stringify(requestBody, { encode: false }), momoSecretKey)
@@ -69,6 +72,48 @@ export class PaymentService {
       console.error('Lỗi khi gọi API MoMo:', error?.response?.data || error.message);
       throw new InternalServerErrorException('Lỗi kết nối cổng thanh toán');
     }
+  }
+
+  async verifyPayment(momoPaymentDto: MomoPaymentDto) {
+
+    const momoPartnerCode = process.env.MOMO_PARTNER_CODE
+    const momoAccessKey = process.env.MOMO_ACCESS_KEY
+    const momoSecretKey = process.env.MOMO_SECRET_KEY
+
+    const rawData = {
+      accessKey: momoAccessKey,
+      amount: momoPaymentDto.amount,
+      extraData: momoPaymentDto.extraData,
+      message: momoPaymentDto.message,
+      orderId: momoPaymentDto.orderId,
+      orderInfo: momoPaymentDto.orderInfo,
+      orderType: momoPaymentDto.orderType,
+      partnerCode: momoPartnerCode,
+      payType: momoPaymentDto.payType,
+      requestId: momoPaymentDto.requestId,
+      responseTime: momoPaymentDto.responseTime,
+      resultCode: momoPaymentDto.resultCode,
+      transId: momoPaymentDto.transId,
+    }
+
+    const signature = this.generateMoMoSignature(
+      queryString.stringify(rawData, { encode: false }),
+      momoSecretKey
+    )
+    const signatureFromMomo = momoPaymentDto.signature
+
+    if (!(signatureFromMomo === signature)) throw new ForbiddenException("Signature doesn't match")
+
+    const resultCode = Number(momoPaymentDto.resultCode);
+    if (resultCode === 0) {
+      // Code cập nhật DB thành công tại đây (e.g., Đơn hàng Đã Thanh Toán)
+      console.log(`Đơn hàng ${momoPaymentDto.orderId} giao dịch thành công.`);
+    } else {
+      // Giao dịch thất bại hoặc người dùng hủy quét mã
+      console.log(`Đơn hàng ${momoPaymentDto.orderId} bị lỗi/hủy với mã: ${resultCode}`);
+    }
+
+    return true;
   }
 
   findAll() {

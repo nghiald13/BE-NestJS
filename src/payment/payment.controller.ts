@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus } from '@nestjs/common';
 import { PaymentService } from './payment.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
-import { UpdatePaymentDto } from './dto/update-payment.dto';
+import { Public } from '../decorators/decor';
+import { MomoPaymentDto } from './dto/update-payment.dto';
 
 @Controller('payment')
 export class PaymentController {
@@ -10,6 +11,13 @@ export class PaymentController {
   @Post()
   create(@Body() createPaymentDto: CreatePaymentDto) {
     return this.paymentService.create(createPaymentDto);
+  }
+
+  @Post('checkout')
+  @Public()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  checkout(@Body() momoPaymentDto: MomoPaymentDto) {
+    return this.paymentService.verifyPayment(momoPaymentDto)
   }
 
   // @Get()
