@@ -21,7 +21,7 @@ export class ProductsService {
   async findAll(query: string, current: number, pageSize: number) {
 
     const { filter } = aqp(query, {
-      whitelist: ['kw', 'manufacturer']
+      whitelist: ['kw', 'manufacturer', '_id']
     })
 
     const kw = filter.kw && typeof filter.kw !== 'object' ? String(filter.kw).trim() : ''

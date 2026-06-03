@@ -11,11 +11,12 @@ import { MailerModule } from '@nestjs-modules/mailer';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/adapters/handlebars.adapter';
 import { TransformInterceptor } from './core/transform.interceptor';
 import { ProductsModule } from './modules/products/products.module';
+import { PaymentModule } from './payment/payment.module';
 
 @Module({
   imports: [
     UsersModule,
-    ConfigModule.forRoot({isGlobal: true}),
+    ConfigModule.forRoot({ isGlobal: true }),
     AuthModule,
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
@@ -52,7 +53,9 @@ import { ProductsModule } from './modules/products/products.module';
     }),
 
     ProductsModule,
-    
+
+    PaymentModule,
+
   ],
   controllers: [AppController],
   providers: [
@@ -68,4 +71,4 @@ import { ProductsModule } from './modules/products/products.module';
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }
