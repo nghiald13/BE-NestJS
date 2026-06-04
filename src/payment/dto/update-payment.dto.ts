@@ -32,7 +32,7 @@ export class MomoPaymentDto {
     @IsNotEmpty()
     message: string;
 
-    @IsNotEmpty()
+    @IsOptional() // Khi hủy thanh toán, MoMo trả về rỗng
     payType: string;
 
     @IsNotEmpty()

@@ -1,9 +1,9 @@
 import { BadGatewayException, BadRequestException, Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import { InjectModel } from '@nestjs/mongoose';
 import { User } from './schemas/user.schema';
-import { Connection, isValidObjectId, Model } from 'mongoose';
+import { isValidObjectId, Model } from 'mongoose';
 import { hashPasswordHelper } from '../../helpers/utilities';
 import aqp from 'api-query-params';
 import { CreateAuthDto } from '../../auth/dto/create-auth.dto';
@@ -14,7 +14,6 @@ import { VerifyAuthDto } from '../../auth/dto/update-auth.dto';
 @Injectable()
 export class UsersService {
   constructor(
-    @InjectConnection() private readonly connection: Connection,
     @InjectModel(User.name)
     private userModel: Model<User>,
     private readonly mailerService: MailerService,

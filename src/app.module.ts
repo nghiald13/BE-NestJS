@@ -12,6 +12,7 @@ import { HandlebarsAdapter } from '@nestjs-modules/mailer/adapters/handlebars.ad
 import { TransformInterceptor } from './core/transform.interceptor';
 import { ProductsModule } from './modules/products/products.module';
 import { PaymentModule } from './payment/payment.module';
+import { OrdersModule } from './modules/orders/orders.module';
 
 @Module({
   imports: [
@@ -55,6 +56,8 @@ import { PaymentModule } from './payment/payment.module';
     ProductsModule,
 
     PaymentModule,
+
+    OrdersModule,
 
   ],
   controllers: [AppController],

@@ -35,6 +35,9 @@ export class ProductsService {
       filter.name = regexSearch
     }
 
+    if (filter.manufacturer !== 'string' && Array.isArray(filter.manufacturer))
+      delete filter.manufacturer
+
     if (!current) current = 1
     if (!pageSize) pageSize = 24
 
@@ -43,6 +46,7 @@ export class ProductsService {
       .find(filter)
       .limit(pageSize)
       .skip(offset)
+      .select("-updatedAt")
       .lean()
 
     const totalItems = await this.productModel.countDocuments(filter)

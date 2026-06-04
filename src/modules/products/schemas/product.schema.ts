@@ -15,7 +15,7 @@ export class Product {
     price: number
 
     @Prop()
-    quantity: number
+    in_stock: number
 }
 
 
