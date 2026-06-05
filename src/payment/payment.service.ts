@@ -52,7 +52,7 @@ export class PaymentService {
       accessKey: momoAccessKey,
       amount: +createPaymentDto.billing.totalPrice,
       extraData: "",
-      ipnUrl: `${process.env.NGROK_HOOK}/api/v1/payment/checkout`,
+      ipnUrl: `${process.env.BACK_END_BASE_URL}/api/v1/payment/checkout`,
       orderId: orderId,
       orderInfo: `Thanh toan don ${orderId}`,
       partnerCode: momoPartnerCode,
