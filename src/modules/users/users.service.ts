@@ -83,7 +83,9 @@ export class UsersService {
 
   async verifyAccount(verifyAuthDto: VerifyAuthDto) {
     try {
-      const user = await this.userModel.findById(verifyAuthDto._id)
+      const user = await this.userModel.findOne(
+        { email: verifyAuthDto.email }
+      )
       if (!user) throw new BadRequestException();
 
       const result = await verify({
@@ -105,8 +107,10 @@ export class UsersService {
 
   }
 
-  async sendVerificationEmail(_id: string) {
-    const user = await this.userModel.findById(_id)
+  async sendVerificationEmail(email: string) {
+    const user = await this.userModel.findOne(
+      { email }
+    )
     if (!user) throw new BadRequestException()
 
     try {

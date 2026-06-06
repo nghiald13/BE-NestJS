@@ -6,7 +6,7 @@ export class UpdateAuthDto {
 
 export class VerifyAuthDto {
     @IsNotEmpty()
-    _id: string;
+    email: string;
 
     @IsNotEmpty()
     codeId: string;
