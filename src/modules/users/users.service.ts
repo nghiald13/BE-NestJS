@@ -109,7 +109,7 @@ export class UsersService {
 
   async sendVerificationEmail(email: string) {
     const user = await this.userModel.findOne(
-      { email }
+      { email: email }
     )
     if (!user) throw new BadRequestException()
 
