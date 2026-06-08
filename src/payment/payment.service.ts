@@ -50,7 +50,7 @@ export class PaymentService {
 
     const requestBody = {
       accessKey: momoAccessKey,
-      amount: +createPaymentDto.billing.totalPrice,
+      amount: +createPaymentDto.billing.totalPrice + +createPaymentDto.billing.taxAmount,
       extraData: "",
       ipnUrl: `${process.env.BACK_END_BASE_URL}/api/v1/payment/checkout`,
       orderId: orderId,
@@ -85,7 +85,7 @@ export class PaymentService {
         userId: createPaymentDto.userInfo._id,
         orderCode: orderId,
         customerEmail: createPaymentDto.userInfo.email,
-        totalAmount: createPaymentDto.billing.totalPrice,
+        totalAmount: requestBody.amount,
       })
       await order.save({ session })
 
@@ -196,7 +196,12 @@ export class PaymentService {
       // Update order status
       await this.orderModel.findOneAndUpdate(
         { orderCode: momoPaymentDto.orderId },
-        { status: 'FAILED' }
+        {
+          status: 'FAILED',
+          momoTransId: momoPaymentDto.transId.toString(),
+          momoPayType: momoPaymentDto.payType,
+          paymentAt: new Date(momoPaymentDto.responseTime)
+        }
       );
       console.log(`Đơn hàng ${momoPaymentDto.orderId} bị lỗi/hủy với mã: ${resultCode}. Đã cập nhật FAILED.`);
     }
