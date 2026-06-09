@@ -36,11 +36,17 @@ import { OrdersModule } from './modules/orders/orders.module';
         transport: {
           host: config.get('MAIL_HOST'),
           port: +config.get('MAIL_PORT'),
-          secure: true,
+          secure: false,
           auth: {
             user: config.get('MAIL_USER'),
             pass: config.get('MAIL_PASS'),
           },
+          connectionTimeout: 10000,
+          greetingTimeout: 10000,
+          family: 4,
+          tls: {
+            rejectUnauthorized: false
+          }
         },
         defaults: {
           from: config.get('MAIL_FROM'),
