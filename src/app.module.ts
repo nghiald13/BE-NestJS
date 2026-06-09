@@ -35,7 +35,7 @@ import { OrdersModule } from './modules/orders/orders.module';
       useFactory: async (config: ConfigService) => ({
         transport: {
           host: config.get('MAIL_HOST'),
-          port: config.get('MAIL_PORT'),
+          port: +config.get('MAIL_PORT'),
           secure: true,
           auth: {
             user: config.get('MAIL_USER'),
