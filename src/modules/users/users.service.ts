@@ -108,10 +108,14 @@ export class UsersService {
   }
 
   async sendVerificationEmail(email: string) {
+    console.log(">>> [SendEmail] Bắt đầu xử lý cho email:", email);
     const user = await this.userModel.findOne(
       { email: email }
     )
-    if (!user) throw new BadRequestException()
+    if (!user) {
+      console.log(`>>> [SendEmail] Thất bại: Không tìm thấy user với email ${email}`);
+      throw new BadRequestException("Invalid Email")
+    }
 
     try {
       //Generate OTP 6 digits
@@ -119,7 +123,10 @@ export class UsersService {
         secret: user.codeSecret,
       })
 
-      await this.mailerService.sendMail({
+      console.log(">>> [SendEmail] Đã tạo thành công OTP Code:", codeId);
+      console.log(">>> [SendEmail] Chuẩn bị gọi mailerService.sendMail...");
+
+      const mailResult = await this.mailerService.sendMail({
         to: user.email,
         subject: 'Verify your email to activate account @Fullstack',
         template: 'register',
@@ -127,11 +134,15 @@ export class UsersService {
           name: user?.name ?? user.email,
           activationCode: codeId
         },
-      })
-    } catch (error) {
+      });
+      console.log(">>> [SendEmail] GỬI MAIL THÀNH CÔNG! Phản hồi từ Mail Server:", mailResult);
+    } catch (error: any) {
+      console.error(">>> [SendEmail] LỖI TRONG QUÁ TRÌNH GỬI MAIL:");
+      console.error("- Message:", error?.message);
+      console.error("- Code (SMTP):", error?.code);
+      console.error("- Stack Trace:", error?.stack);
       throw new BadRequestException(error)
     }
-
     return {
       isSent: true
     }
