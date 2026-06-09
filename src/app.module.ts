@@ -13,6 +13,8 @@ import { TransformInterceptor } from './core/transform.interceptor';
 import { ProductsModule } from './modules/products/products.module';
 import { PaymentModule } from './payment/payment.module';
 import { OrdersModule } from './modules/orders/orders.module';
+import * as dns from 'dns';
+import { join } from 'path';
 
 @Module({
   imports: [
@@ -41,9 +43,13 @@ import { OrdersModule } from './modules/orders/orders.module';
             user: config.get('MAIL_USER'),
             pass: config.get('MAIL_PASS'),
           },
-          connectionTimeout: 10000,
-          greetingTimeout: 10000,
-          family: 4,
+
+          lookup: (hostname, options, callback) => {
+            dns.lookup(hostname, { ...options, family: 4 }, (err, address, family) => {
+              callback(err, address, family);
+            });
+          },
+
           tls: {
             rejectUnauthorized: false
           }
@@ -52,7 +58,7 @@ import { OrdersModule } from './modules/orders/orders.module';
           from: config.get('MAIL_FROM'),
         },
         template: {
-          dir: process.cwd() + '/src/mailer/templates/',
+          dir: join(__dirname, 'mailer', 'templates'),
           adapter: new HandlebarsAdapter(),
           options: { strict: true },
         },
