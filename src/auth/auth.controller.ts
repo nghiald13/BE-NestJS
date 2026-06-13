@@ -1,5 +1,5 @@
 
-import { Body, Controller, Post, HttpCode, HttpStatus, UseGuards, Request, Get } from '@nestjs/common';
+import { Body, Controller, Post, UseGuards, Request, Get, Response } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './passport/local-auth.guard';
 import { JwtAuthGuard } from './passport/jwt-auth.guard';
@@ -37,4 +37,11 @@ export class AuthController {
   sendEmail(@Body() obj: any) {
     return this.authService.sendEmail(obj.email)
   }
+
+  @Public()
+  @Post('google')
+  async googleAuth(@Body() googleData: any) {
+    return this.authService.googleSignIn(googleData)
+  }
+
 }

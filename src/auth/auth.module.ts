@@ -17,7 +17,7 @@ import { JwtStrategy } from './passport/jwt.strategy';
         global: true,
         secret: configService.get<string>('JWT_SECRET'),
         signOptions: {
-            expiresIn: configService.get('JWT_ACCESS_TOKEN_EXPIRES')
+          expiresIn: configService.get('JWT_ACCESS_TOKEN_EXPIRES')
         },
       }),
       inject: [ConfigService],
@@ -26,6 +26,10 @@ import { JwtStrategy } from './passport/jwt.strategy';
 
   ],
   controllers: [AuthController],
-  providers: [AuthService, LocalStrategy, JwtStrategy],
+  providers: [
+    AuthService,
+    LocalStrategy,
+    JwtStrategy,
+  ],
 })
-export class AuthModule {}
+export class AuthModule { }

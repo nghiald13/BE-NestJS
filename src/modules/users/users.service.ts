@@ -10,6 +10,7 @@ import { CreateAuthDto } from '../../auth/dto/create-auth.dto';
 import { MailerService } from '@nestjs-modules/mailer';
 import { generate, generateSecret, verify } from 'otplib';
 import { VerifyAuthDto } from '../../auth/dto/update-auth.dto';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class UsersService {
@@ -214,5 +215,24 @@ export class UsersService {
       //Handling Exception
       throw new BadGatewayException('Invalid Object id')
     }
+  }
+
+  // Sign In or Sign Up
+  async signInOrSignUp(googleUser: any) {
+    // Get User from request
+    let user = await this.userModel.findOne({ email: googleUser.email })
+    if (!user) {
+      // Create an user here
+      user = await this.userModel.create({
+        accountType: 'GOOGLE',
+        name: googleUser.name,
+        email: googleUser.email,
+        isActive: true,
+        codeSecret: generateSecret(),
+        password: await hashPasswordHelper(uuidv4())
+      })
+    }
+
+    return user
   }
 }

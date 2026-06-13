@@ -40,6 +40,12 @@ export class AuthService {
     }
   }
 
+  async googleSignIn(googleUser: any) {
+    // Call service that return an user, if user doesn't exist, create one and return user
+    const user = await this.usersService.signInOrSignUp(googleUser)
+    return await this.signIn(user)
+  }
+
   signUp = async (signUpDto: CreateAuthDto) => {
     return await this.usersService.signUp(signUpDto)
   }
