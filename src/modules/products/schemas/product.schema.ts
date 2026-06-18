@@ -1,10 +1,10 @@
 import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
-import { HydratedDocument } from 'mongoose';
+import { HydratedDocument, Document, Schema as MongooseSchema } from 'mongoose';
 
 export type ProductDocument = HydratedDocument<Product>
 
 @Schema({ timestamps: true, })
-export class Product {
+export class Product extends Document {
     @Prop()
     name: string
 
@@ -16,6 +16,12 @@ export class Product {
 
     @Prop()
     in_stock: number
+
+    @Prop({ type: MongooseSchema.Types.Mixed, default: {} })
+    description: string
+
+    @Prop({ type: MongooseSchema.Types.Mixed, default: {} })
+    spec: any
 }
 
 

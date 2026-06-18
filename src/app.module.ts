@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { CacheModule } from '@nestjs/cache-manager'
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { UsersModule } from './modules/users/users.module';
@@ -15,6 +16,7 @@ import { PaymentModule } from './payment/payment.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import * as dns from 'dns';
 import { join } from 'path';
+import { createClient } from 'redis';
 
 @Module({
   imports: [
@@ -63,6 +65,23 @@ import { join } from 'path';
           options: { strict: true },
         },
       }),
+    }),
+
+    // Redis Cache
+    CacheModule.registerAsync({
+      isGlobal: true,
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (configService: ConfigService) => {
+        const redisUrl = configService.get<string>('REDIS_URL');
+        const redisClient = createClient({ url: redisUrl });
+        await redisClient.connect();
+
+        return {
+          store: () => redisClient,
+          ttl: 300000,
+        };
+      },
     }),
 
     ProductsModule,

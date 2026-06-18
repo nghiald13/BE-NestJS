@@ -1,9 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { Product } from './schemas/product.schema';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { isValidObjectId, Model } from 'mongoose';
 import aqp from 'api-query-params';
 
 @Injectable()
@@ -21,7 +21,8 @@ export class ProductsService {
   async findAll(query: string, current: number, pageSize: number) {
 
     const { filter } = aqp(query, {
-      whitelist: ['kw', 'manufacturer', '_id']
+      whitelist: ['kw', 'manufacturer', '_id'],
+      
     })
 
     const kw = filter.kw && typeof filter.kw !== 'object' ? String(filter.kw).trim() : ''
@@ -61,9 +62,14 @@ export class ProductsService {
     }
   }
 
-  // findOne(id: number) {
-  //   return `This action returns a #${id} product`;
-  // }
+  async findOne(productId: string) {
+    if (!isValidObjectId(productId)) throw new BadRequestException("Incorrect productId format")
+    const product = await this.productModel.findOne({
+      _id: productId
+    })
+    if (!product) throw new BadRequestException("Non-existed product")
+    return product
+  }
 
   update(id: number, updateProductDto: UpdateProductDto) {
     return `This action updates a #${id} product`;

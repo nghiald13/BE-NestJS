@@ -23,11 +23,11 @@ export class ProductsController {
     return this.productsService.findAll(query, +current, +pageSize);
   }
 
-  // @Public()
-  // @Get(':id')
-  // findOne(@Param('id') id: string) {
-  //   return this.productsService.findOne(+id);
-  // }
+  @Public()
+  @Get(':productId')
+  findOne(@Param('productId') productId: string) {
+    return this.productsService.findOne(productId);
+  }
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateProductDto: UpdateProductDto) {
@@ -40,7 +40,7 @@ export class ProductsController {
   }
 
   @Public()
-  @Get('manufacturers')
+  @Get('meta/manufacturers')
   getDistinctManufacturers() {
     return this.productsService.getDistinctManufacturers()
   }
