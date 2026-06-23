@@ -17,6 +17,7 @@ import { OrdersModule } from './modules/orders/orders.module';
 import * as dns from 'dns';
 import { join } from 'path';
 import { createClient } from 'redis';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -89,6 +90,8 @@ import { createClient } from 'redis';
     PaymentModule,
 
     OrdersModule,
+
+    AdminModule,
 
   ],
   controllers: [AppController],

@@ -22,6 +22,9 @@ export class Product extends Document {
 
     @Prop({ type: MongooseSchema.Types.Mixed, default: {} })
     spec: any
+
+    @Prop()
+    status: string
 }
 
 

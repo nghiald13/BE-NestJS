@@ -21,8 +21,8 @@ export class ProductsService {
   async findAll(query: string, current: number, pageSize: number) {
 
     const { filter } = aqp(query, {
-      whitelist: ['kw', 'manufacturer', '_id'],
-      
+      whitelist: ['kw', 'manufacturer'],
+
     })
 
     const kw = filter.kw && typeof filter.kw !== 'object' ? String(filter.kw).trim() : ''
@@ -47,7 +47,7 @@ export class ProductsService {
       .find(filter)
       .limit(pageSize)
       .skip(offset)
-      .select("-updatedAt")
+      .select("-specifications -descriptionJson -updatedAt")
       .lean()
 
     const totalItems = await this.productModel.countDocuments(filter)
@@ -81,5 +81,31 @@ export class ProductsService {
 
   async getDistinctManufacturers() {
     return this.productModel.distinct('manufacturer').exec()
+  }
+
+  async getStatistics() {
+
+    const stats = await this.productModel.aggregate([{
+      $group: {
+        _id: null, // get all products
+        totalItems: { $sum: 1 },
+        totalInStock: {
+          $sum: { $cond: [{ $gte: ["in_stock", 100] }, 1, 0] }
+        },
+        totalLowStock: {
+          $sum: { $cond: [{ $lt: ["in_stock", 100] }, 1, 0] }
+        },
+        totalOutOfStock: {
+          $sum: { $cond: [{ $eq: ["in_stock", 0] }, 1, 0] }
+        },
+      }
+    }]).exec()
+
+    return {
+      totalItems: stats[0].totalItems,
+      totalInStock: stats[0].totalInStock,
+      totalLowStock: stats[0].totalLowStock,
+      totalOutOfStock: stats[0].totalOutOfStock
+    }
   }
 }
