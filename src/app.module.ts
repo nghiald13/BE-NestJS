@@ -16,8 +16,11 @@ import { PaymentModule } from './payment/payment.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import * as dns from 'dns';
 import { join } from 'path';
-import { createClient } from 'redis';
 import { AdminModule } from './admin/admin.module';
+import KeyvRedis from '@keyv/redis';
+import { Keyv } from 'keyv';
+import { KeyvCacheableMemory } from 'cacheable';
+import { deserialize, serialize } from 'v8';
 
 @Module({
   imports: [
@@ -74,15 +77,16 @@ import { AdminModule } from './admin/admin.module';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: async (configService: ConfigService) => {
-        const redisUrl = configService.get<string>('REDIS_URL');
-        const redisClient = createClient({ url: redisUrl });
-        await redisClient.connect();
+        const store = new KeyvRedis(
+          configService.get<string>('REDIS_URL'),
 
+        )
         return {
-          store: () => redisClient,
-          ttl: 300000,
-        };
-      },
+          stores: [store],
+          ttl: +configService.get<string>('CACHE_TTL')
+        }
+      }
+
     }),
 
     ProductsModule,

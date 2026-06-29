@@ -205,6 +205,19 @@ export class UsersService {
     return result;
   }
 
+  async updateRefreshToken(_id: string, refresh_token: string) {
+    if (isValidObjectId(_id)) {
+      await this.userModel.updateOne(
+        { _id: _id },
+        { refresh_token: refresh_token }
+      )
+      return true
+    } else {
+      console.log("Invalid MongoDB Object Id")
+    }
+    return false
+  }
+
   //Remove a user WITHOUT making new DeleteUserDto
   async remove(_id: string) {
     //Check whether _id is valid MongoDB Object Id

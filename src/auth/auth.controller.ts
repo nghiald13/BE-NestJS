@@ -1,11 +1,13 @@
 
-import { Body, Controller, Post, UseGuards, Request, Get, Response } from '@nestjs/common';
+import { Body, Controller, Post, UseGuards, Request, Get, Res } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './passport/local-auth.guard';
 import { JwtAuthGuard } from './passport/jwt-auth.guard';
-import { Public, ResponseMessage } from '../decorators/decor';
+import { Cookies, Public, ResponseMessage } from '../decorators/decor';
 import { CreateAuthDto } from './dto/create-auth.dto';
 import { VerifyAuthDto } from './dto/update-auth.dto';
+import { JwtRefreshGuard } from './passport/jwt-refresh.guard';
+import { Response } from 'express';
 
 @Controller('auth')
 export class AuthController {
@@ -15,8 +17,10 @@ export class AuthController {
   @Public()
   @UseGuards(LocalAuthGuard)
   @ResponseMessage("Fetch SignIn")
-  signIn(@Request() req) {
-    return this.authService.signIn(req.user);
+  signIn(
+    @Request() req,
+    @Res({ passthrough: true }) res: Response) {
+    return this.authService.signIn(req.user, res);
   }
 
   @Public()
@@ -40,8 +44,18 @@ export class AuthController {
 
   @Public()
   @Post('google')
-  async googleAuth(@Body() googleData: any) {
-    return this.authService.googleSignIn(googleData)
+  async googleAuth(@Body() googleData: any, @Res({ passthrough: true }) res: Response) {
+    return this.authService.googleSignIn(googleData, res)
+  }
+
+  @Public()
+  @Post('refresh')
+  @UseGuards(JwtRefreshGuard)
+  async handleRefreshToken(
+    @Request() req,
+    // @Cookies('refresh_token') refresh_token: string
+  ) {
+    return this.authService.processRefreshToken(req.user)
   }
 
 }

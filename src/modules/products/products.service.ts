@@ -1,10 +1,11 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { Product } from './schemas/product.schema';
 import { InjectModel } from '@nestjs/mongoose';
 import { isValidObjectId, Model } from 'mongoose';
 import aqp from 'api-query-params';
+import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 
 @Injectable()
 export class ProductsService {
@@ -12,6 +13,9 @@ export class ProductsService {
   constructor(
     @InjectModel(Product.name)
     private productModel: Model<Product>,
+
+    @Inject(CACHE_MANAGER)
+    private cacheManager: Cache,
   ) { }
 
   create(createProductDto: CreateProductDto) {
@@ -63,11 +67,27 @@ export class ProductsService {
   }
 
   async findOne(productId: string) {
+
+    // Attempt to get from cache frist
+    const cacheKey = `product:${productId}`
+    const cacheValue = await this.cacheManager.get(cacheKey)
+    if (cacheValue) {
+      console.log(`${cacheKey} found in Redis Caches`)
+      return cacheValue
+    }
+
+    // If product hasn't been cached
+    console.log(`${cacheKey} not found in Redis Caches. Processing to fetch from DB and cache data`)
     if (!isValidObjectId(productId)) throw new BadRequestException("Incorrect productId format")
     const product = await this.productModel.findOne({
       _id: productId
     })
     if (!product) throw new BadRequestException("Non-existed product")
+
+    // Cache product if found any
+    await this.cacheManager.set(cacheKey, product)
+    console.log(`Cached ${cacheKey} into Redis`)
+
     return product
   }
 
@@ -80,32 +100,35 @@ export class ProductsService {
   }
 
   async getDistinctManufacturers() {
-    return this.productModel.distinct('manufacturer').exec()
+
+    const cacheKey = `product:manufacturers`
+    const cacheValue = await this.cacheManager.get(cacheKey)
+    if (cacheValue) {
+      // console.log(`${cacheKey} found in Redis Caches`)
+      return cacheValue
+    } else {
+      // console.log(`${cacheKey} not found in Redis Caches. Processing to fetch from DB and cache data`)
+    }
+
+    const manufacturers = await this.productModel.distinct('manufacturer').exec()
+    await this.cacheManager.set(cacheKey, manufacturers)
+    // console.log(await this.cacheManager.get(cacheKey))
+
+    return manufacturers
   }
 
   async getStatistics() {
-
-    const stats = await this.productModel.aggregate([{
+    
+    const [stats] = await this.productModel.aggregate([{
       $group: {
-        _id: null, // get all products
+        _id: null,
         totalItems: { $sum: 1 },
-        totalInStock: {
-          $sum: { $cond: [{ $gte: ["in_stock", 100] }, 1, 0] }
-        },
-        totalLowStock: {
-          $sum: { $cond: [{ $lt: ["in_stock", 100] }, 1, 0] }
-        },
-        totalOutOfStock: {
-          $sum: { $cond: [{ $eq: ["in_stock", 0] }, 1, 0] }
-        },
-      }
+        totalInStock: { $sum: { $cond: [{ $eq: ['$status', 'IN_STOCK'] }, 1, 0] } },
+        totalLowStock: { $sum: { $cond: [{ $eq: ['$status', 'LOW_STOCK'] }, 1, 0] } },
+        totalOutOfStock: { $sum: { $cond: [{ $eq: ['$status', 'OUT_OF_STOCK'] }, 1, 0] } },
+      },
     }]).exec()
 
-    return {
-      totalItems: stats[0].totalItems,
-      totalInStock: stats[0].totalInStock,
-      totalLowStock: stats[0].totalLowStock,
-      totalOutOfStock: stats[0].totalOutOfStock
-    }
+    return stats
   }
 }

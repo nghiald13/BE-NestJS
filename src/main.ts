@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import cookieParser from 'cookie-parser'
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -12,7 +13,8 @@ async function bootstrap() {
   //Activates Validation
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
-    forbidNonWhitelisted: true,
+    // forbidNonWhitelisted: true,
+    // skipUndefinedProperties: true,
   }));
 
   app.setGlobalPrefix('api/v1', {
@@ -27,6 +29,8 @@ async function bootstrap() {
     preflightContinue: false,
     credentials: true,
   });
+
+  app.use(cookieParser())
 
   const config = new DocumentBuilder()
     .setTitle('Cats example')

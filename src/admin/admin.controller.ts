@@ -10,7 +10,7 @@ import { Role } from '../auth/roles.enum';
 @Roles(Role.ADMIN)
 @Controller('admin')
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(private readonly adminService: AdminService) { }
 
   // @Post()
   // create(@Body() createAdminDto: CreateAdminDto) {
@@ -37,7 +37,7 @@ export class AdminController {
   //   return this.adminService.remove(+id);
   // }
 
-  @Get('/products/stats')
+  @Get('/products/statistics')
   async getProductStatistics() {
     return this.adminService.getProductsStatistics()
   }
