@@ -18,7 +18,8 @@ export class ProductsService {
     private cacheManager: Cache,
   ) { }
 
-  create(createProductDto: CreateProductDto) {
+  async create(createProductDto: CreateProductDto) {
+    // await this.productModel.insertMany()
     return 'This action adds a new product';
   }
 

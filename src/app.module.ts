@@ -21,6 +21,7 @@ import KeyvRedis from '@keyv/redis';
 import { Keyv } from 'keyv';
 import { KeyvCacheableMemory } from 'cacheable';
 import { deserialize, serialize } from 'v8';
+import { CloudinaryModule } from './cloudinary/cloudinary.module';
 
 @Module({
   imports: [
@@ -96,6 +97,8 @@ import { deserialize, serialize } from 'v8';
     OrdersModule,
 
     AdminModule,
+
+    CloudinaryModule,
 
   ],
   controllers: [AppController],
