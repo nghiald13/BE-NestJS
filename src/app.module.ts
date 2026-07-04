@@ -22,6 +22,7 @@ import { Keyv } from 'keyv';
 import { KeyvCacheableMemory } from 'cacheable';
 import { deserialize, serialize } from 'v8';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
+import { SubscribersModule } from './subscribers/subscribers.module';
 
 @Module({
   imports: [
@@ -99,6 +100,8 @@ import { CloudinaryModule } from './cloudinary/cloudinary.module';
     AdminModule,
 
     CloudinaryModule,
+
+    SubscribersModule,
 
   ],
   controllers: [AppController],
