@@ -8,6 +8,7 @@ import { Public } from '../../decorators/decor';
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) { }
 
+  // ===================== Static Routes =====================
   @Post()
   create(@Body() createProductDto: CreateProductDto) {
     return this.productsService.create(createProductDto);
@@ -24,6 +25,23 @@ export class ProductsController {
   }
 
   @Public()
+  @Post(`getDetail`)
+  getDetailById(@Body('productId') productId: string[]) {
+    return this.productsService.getDetailById(productId);
+  }
+
+  @Public()
+  @Get('meta/manufacturers')
+  getDistinctManufacturers() {
+    return this.productsService.getDistinctManufacturers()
+  }
+
+
+
+
+
+  // ===================== Dynamic Routes =====================
+  @Public()
   @Get(':productId')
   findOne(@Param('productId') productId: string) {
     return this.productsService.findOne(productId);
@@ -37,11 +55,5 @@ export class ProductsController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.productsService.remove(+id);
-  }
-
-  @Public()
-  @Get('meta/manufacturers')
-  getDistinctManufacturers() {
-    return this.productsService.getDistinctManufacturers()
   }
 }

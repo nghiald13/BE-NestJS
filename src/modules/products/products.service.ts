@@ -1,11 +1,12 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-import { Product } from './schemas/product.schema';
-import { InjectModel } from '@nestjs/mongoose';
-import { isValidObjectId, Model } from 'mongoose';
+import { Product, ProductDocument } from './schemas/product.schema';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import { Connection, isValidObjectId, Model } from 'mongoose';
 import aqp from 'api-query-params';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
+import { BulkProductDto, BulkProductItemDto } from '../../admin/dto/create-admin.dto';
 
 @Injectable()
 export class ProductsService {
@@ -16,7 +17,11 @@ export class ProductsService {
 
     @Inject(CACHE_MANAGER)
     private cacheManager: Cache,
+
+    @InjectConnection()
+    private readonly connection: Connection,
   ) { }
+
 
   async create(createProductDto: CreateProductDto) {
     // await this.productModel.insertMany()
@@ -92,6 +97,14 @@ export class ProductsService {
     return product
   }
 
+  // Business function for Basic Detail display (cart)
+  async getDetailById(productId: string[]) {
+    const result = await this.productModel
+      .find({_id: { $in: productId}})
+      .select("-specification -description -status -createdAt -updatedAt")
+    return result
+  }
+
   update(id: number, updateProductDto: UpdateProductDto) {
     return `This action updates a #${id} product`;
   }
@@ -119,7 +132,7 @@ export class ProductsService {
   }
 
   async getStatistics() {
-    
+
     const [stats] = await this.productModel.aggregate([{
       $group: {
         _id: null,
@@ -131,5 +144,38 @@ export class ProductsService {
     }]).exec()
 
     return stats
+  }
+
+  // Admin Businesses
+  async addBulkProduct(bulkProductDto: BulkProductDto) {
+    const session = await this.connection.startSession();
+    session.startTransaction();
+    try {
+      const products: Partial<Product>[] = bulkProductDto.items.map(p => ({
+        name: p.name,
+        price: p.price,
+        manufacturer: p.manufacturer,
+        in_stock: p.in_stock,
+        image: p.image,
+        specification: p.specification,
+        description: p.description,
+        status: "OUT_OF_STOCK"
+      }))
+      await this.productModel.insertMany(products, {session})
+      await session.commitTransaction();
+
+      return {
+        message: `Added ${products.length} items into products schema`
+      }
+    } catch (error) {
+      await session.abortTransaction();
+    } finally {
+      session.endSession();
+    }
+
+    return {
+      error: "Internal Server Error",
+      message: "There was an error while adding products"
+    }
   }
 }

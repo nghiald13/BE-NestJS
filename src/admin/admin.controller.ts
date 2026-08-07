@@ -1,6 +1,6 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, HttpStatus, HttpCode } from '@nestjs/common';
 import { AdminService } from './admin.service';
-import { CreateAdminDto } from './dto/create-admin.dto';
+import { BulkProductDto } from './dto/create-admin.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
 import { RolesGuard } from '../auth/passport/roles-auth.guard';
 import { Roles } from '../decorators/decor';
@@ -37,8 +37,17 @@ export class AdminController {
   //   return this.adminService.remove(+id);
   // }
 
+
   @Get('/products/statistics')
+  @Roles(Role.ADMIN)
   async getProductStatistics() {
     return this.adminService.getProductsStatistics()
+  }
+
+  @Post(`/products/bulk`)
+  @Roles(Role.ADMIN)
+  @HttpCode(HttpStatus.CREATED)
+  async addBulkProduct(@Body() bulkProductDto: BulkProductDto) {
+    return this.adminService.addBulkProduct(bulkProductDto);
   }
 }

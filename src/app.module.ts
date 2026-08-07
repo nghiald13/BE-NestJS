@@ -18,11 +18,7 @@ import * as dns from 'dns';
 import { join } from 'path';
 import { AdminModule } from './admin/admin.module';
 import KeyvRedis from '@keyv/redis';
-import { Keyv } from 'keyv';
-import { KeyvCacheableMemory } from 'cacheable';
-import { deserialize, serialize } from 'v8';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
-import { SubscribersModule } from './subscribers/subscribers.module';
 
 @Module({
   imports: [
@@ -100,8 +96,6 @@ import { SubscribersModule } from './subscribers/subscribers.module';
     AdminModule,
 
     CloudinaryModule,
-
-    SubscribersModule,
 
   ],
   controllers: [AppController],
