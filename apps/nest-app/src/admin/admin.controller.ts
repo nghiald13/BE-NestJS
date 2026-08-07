@@ -2,9 +2,9 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, HttpStatu
 import { AdminService } from './admin.service';
 import { BulkProductDto } from './dto/create-admin.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
-import { RolesGuard } from '../auth/passport/roles-auth.guard';
+import { RolesGuard } from '../../../auth-service/src/modules/auth/passport/roles-auth.guard';
 import { Roles } from '../decorators/decor';
-import { Role } from '../auth/roles.enum';
+import { Role } from '../../../auth-service/src/modules/auth/roles.enum';
 
 @UseGuards(RolesGuard)
 @Roles(Role.ADMIN)

@@ -3,7 +3,7 @@ import { Body, Controller, Post, UseGuards, Request, Get, Res } from '@nestjs/co
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './passport/local-auth.guard';
 import { JwtAuthGuard } from './passport/jwt-auth.guard';
-import { Cookies, Public, ResponseMessage } from '../decorators/decor';
+import { Cookies, Public, ResponseMessage } from '../../../../nest-app/src/decorators/decor';
 import { CreateAuthDto } from './dto/create-auth.dto';
 import { VerifyAuthDto } from './dto/update-auth.dto';
 import { JwtRefreshGuard } from './passport/jwt-refresh.guard';

@@ -1,5 +1,5 @@
 import { SetMetadata, createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { Role } from '../auth/roles.enum';
+import { Role } from '../../../auth-service/src/modules/auth/roles.enum';
 
 export const IS_PUBLIC_KEY = 'isPublic';
 export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);

@@ -4,13 +4,13 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { User } from './schemas/user.schema';
 import { isValidObjectId, Model } from 'mongoose';
-import { hashPasswordHelper } from '../../helpers/utilities';
 import aqp from 'api-query-params';
-import { CreateAuthDto } from '../../auth/dto/create-auth.dto';
 import { MailerService } from '@nestjs-modules/mailer';
 import { generate, generateSecret, verify } from 'otplib';
-import { VerifyAuthDto } from '../../auth/dto/update-auth.dto';
 import { v4 as uuidv4 } from 'uuid';
+import { hashPasswordHelper } from '../../common/utilities';
+import { CreateAuthDto } from '../auth/dto/create-auth.dto';
+import { VerifyAuthDto } from '../auth/dto/update-auth.dto';
 
 @Injectable()
 export class UsersService {

@@ -5,9 +5,9 @@ import { CacheModule } from '@nestjs/cache-manager'
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { UsersModule } from './modules/users/users.module';
-import { AuthModule } from './auth/auth.module';
+import { AuthModule } from '../../auth-service/src/modules/auth/auth.module';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
-import { JwtAuthGuard } from './auth/passport/jwt-auth.guard';
+import { JwtAuthGuard } from '../../auth-service/src/modules/auth/passport/jwt-auth.guard';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/adapters/handlebars.adapter';
 import { TransformInterceptor } from './core/transform.interceptor';
@@ -18,7 +18,7 @@ import * as dns from 'dns';
 import { join } from 'path';
 import { AdminModule } from './admin/admin.module';
 import KeyvRedis from '@keyv/redis';
-import { CloudinaryModule } from './cloudinary/cloudinary.module';
+
 
 @Module({
   imports: [
@@ -94,8 +94,6 @@ import { CloudinaryModule } from './cloudinary/cloudinary.module';
     OrdersModule,
 
     AdminModule,
-
-    CloudinaryModule,
 
   ],
   controllers: [AppController],

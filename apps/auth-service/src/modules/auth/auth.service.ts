@@ -1,11 +1,12 @@
 
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { UsersService } from '../modules/users/users.service';
-import { cmpPassword } from '../helpers/utilities';
+// import { UsersService } from '../modules/users/users.service';
+import { cmpPassword } from '../../common/utilities';
 import { JwtService } from '@nestjs/jwt';
 import { CreateAuthDto } from './dto/create-auth.dto';
 import { VerifyAuthDto } from './dto/update-auth.dto';
 import { ConfigService } from '@nestjs/config';
+import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class AuthService {
@@ -74,7 +75,7 @@ export class AuthService {
       sub: u._id,
       username: u.email,
       role: u.role,
-      
+
     }
 
     return {
