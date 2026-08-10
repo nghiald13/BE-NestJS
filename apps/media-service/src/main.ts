@@ -1,22 +1,23 @@
 import { NestFactory } from '@nestjs/core';
-import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { AsyncMicroserviceOptions, Transport } from '@nestjs/microservices';
 import { MediaServiceModule } from './media-service.module';
+import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
-  const host: string = process.env.HOST;
-  const port: number = +process.env.MEDIA_SERVICE_PORT;
-  const app = await NestFactory.createMicroservice<MicroserviceOptions>(
+  const app = await NestFactory.createMicroservice<AsyncMicroserviceOptions>(
     MediaServiceModule,
     {
-      transport: Transport.TCP,
-      options: {
-        host: host,
-        port: port,
-      }
+      useFactory: (configService: ConfigService) => ({
+        transport: Transport.TCP,
+        options: {
+          host: configService.get('HOST'),
+          port: +configService.get('MEDIA_SERVICE_PORT'),
+        }
+      }),
+      inject: [ConfigService],
     },
   );
 
   await app.listen();
-  console.log(`Media Service started on ${host}:${port}`)
 }
 bootstrap();

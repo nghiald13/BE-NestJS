@@ -1,12 +1,12 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus } from '@nestjs/common';
 import { PaymentService } from './payment.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
-import { Public } from '../decorators/decor';
+import { Public } from '../../../api-gateway/src/decorators/decor';
 import { MomoPaymentDto } from './dto/update-payment.dto';
 
 @Controller('payment')
 export class PaymentController {
-  constructor(private readonly paymentService: PaymentService) {}
+  constructor(private readonly paymentService: PaymentService) { }
 
   @Post()
   create(@Body() createPaymentDto: CreatePaymentDto) {

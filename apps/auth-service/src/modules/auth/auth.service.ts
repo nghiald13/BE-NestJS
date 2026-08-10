@@ -1,6 +1,5 @@
 
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-// import { UsersService } from '../modules/users/users.service';
 import { cmpPassword } from '../../common/utilities';
 import { JwtService } from '@nestjs/jwt';
 import { CreateAuthDto } from './dto/create-auth.dto';

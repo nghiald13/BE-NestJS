@@ -5,9 +5,9 @@ import { AuthController } from './auth.controller';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
-import { LocalStrategy } from './passport/local.strategy';
-import { JwtStrategy } from './passport/jwt-access.strategy';
-import { JwtRefreshStrategy } from './passport/jwt-refresh.strategy';
+import { LocalStrategy } from '../../../../api-gateway/src/passport/local.strategy';
+import { JwtStrategy } from '../../../../api-gateway/src/passport/jwt-access.strategy';
+import { JwtRefreshStrategy } from '../../../../api-gateway/src/passport/jwt-refresh.strategy';
 import { UsersModule } from '../users/users.module';
 
 @Module({
@@ -30,9 +30,6 @@ import { UsersModule } from '../users/users.module';
   controllers: [AuthController],
   providers: [
     AuthService,
-    LocalStrategy,
-    JwtStrategy,
-    JwtRefreshStrategy
   ],
 })
 export class AuthModule { }

@@ -2,7 +2,7 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestj
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-import { Public } from '../../decorators/decor';
+import { Public } from '../../../../api-gateway/src/decorators/decor';
 
 @Controller('products')
 export class ProductsController {

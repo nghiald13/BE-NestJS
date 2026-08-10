@@ -14,15 +14,6 @@
   "monorepo": true,
   "root": "apps/nest-app",
   "projects": {
-    "nest-app": {
-      "type": "application",
-      "root": "apps/nest-app",
-      "entryFile": "main",
-      "sourceRoot": "apps/nest-app/src",
-      "compilerOptions": {
-        "tsConfigPath": "apps/nest-app/tsconfig.app.json"
-      }
-    },
     "api-gateway": {
       "type": "application",
       "root": "apps/api-gateway",
@@ -32,6 +23,15 @@
         "tsConfigPath": "apps/api-gateway/tsconfig.app.json"
       }
     },
+    "auth-service": {
+      "type": "application",
+      "root": "apps/auth-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/auth-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/auth-service/tsconfig.app.json"
+      }
+    },
     "media-service": {
       "type": "application",
       "root": "apps/media-service",
@@ -39,6 +39,15 @@
       "sourceRoot": "apps/media-service/src",
       "compilerOptions": {
         "tsConfigPath": "apps/media-service/tsconfig.app.json"
+      }
+    },
+    "nest-app": {
+      "type": "application",
+      "root": "apps/nest-app",
+      "entryFile": "main",
+      "sourceRoot": "apps/nest-app/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/nest-app/tsconfig.app.json"
       }
     },
     "user-service": {

@@ -2,14 +2,14 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards } f
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { Roles } from 'apps/nest-app/src/decorators/decor';
-import { RolesGuard } from '../auth/passport/roles-auth.guard';
-import { Role } from '../auth/roles.enum';
+import { Roles } from 'apps/api-gateway/src/decorators/decor';
+import { RolesGuard } from '../../../../api-gateway/src/passport/roles-auth.guard';
+import { Role } from '../../../../api-gateway/src/decorators/roles.enum';
 // import { Roles } from '../../decorators/decor';
 // import { Role } from '../../auth/roles.enum';
 // import { RolesGuard } from '../../auth/passport/roles-auth.guard';
 
-@Controller('users')
+@Controller()
 export class UsersController {
   constructor(private readonly usersService: UsersService) { }
 
