@@ -11,7 +11,6 @@ import { TransformInterceptor } from './common/transform.interceptor';
 import { LocalStrategy } from './passport/local.strategy';
 import { JwtStrategy } from './passport/jwt-access.strategy';
 import { JwtRefreshStrategy } from './passport/jwt-refresh.strategy';
-import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 
 @Module({
@@ -19,18 +18,6 @@ import { PassportModule } from '@nestjs/passport';
 
     ConfigModule.forRoot({
       isGlobal: true,
-    }),
-
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        global: true,
-        secret: configService.get<string>('JWT_SECRET'),
-        signOptions: {
-          expiresIn: configService.get('JWT_ACCESS_TOKEN_EXPIRES')
-        },
-      }),
-      inject: [ConfigService],
     }),
 
     PassportModule,

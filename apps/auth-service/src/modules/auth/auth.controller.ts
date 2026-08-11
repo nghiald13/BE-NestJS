@@ -1,13 +1,8 @@
 
-import { Body, Controller, Post, UseGuards, Request, Get, Res } from '@nestjs/common';
+import { Controller } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { LocalAuthGuard } from '../../../../api-gateway/src/passport/local-auth.guard';
-import { JwtAuthGuard } from '../../../../api-gateway/src/passport/jwt-auth.guard';
-import { Cookies, Public, ResponseMessage } from '../../../../api-gateway/src/decorators/decor';
 import { CreateAuthDto } from './dto/create-auth.dto';
 import { VerifyAuthDto } from './dto/update-auth.dto';
-import { JwtRefreshGuard } from '../../../../api-gateway/src/passport/jwt-refresh.guard';
-import { Response } from 'express';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 
 @Controller()
@@ -15,16 +10,16 @@ export class AuthController {
   constructor(private readonly authService: AuthService) { }
 
 
-  @MessagePattern({cmd: 'auth.validate-user'})
-  async validateUser(@Payload() {username, password}) {
+  @MessagePattern({ cmd: 'auth.validate-user' })
+  async validateUser(@Payload() { username, password }) {
     return this.authService.validateUser(username, password);
   }
 
   @MessagePattern({ cmd: 'auth.signIn' })
   async signIn(
-    @Payload() data: { user, res }
+    @Payload() { user }
   ) {
-    return this.authService.signIn(data.user, data.res);
+    return this.authService.signIn(user);
   }
 
   @MessagePattern({ cmd: 'auth.signUp' })
@@ -46,15 +41,15 @@ export class AuthController {
 
 
   @MessagePattern({ cmd: 'auth.google' })
-  async googleAuth(@Payload() data: { googleData, res }) {
-    return this.authService.googleSignIn(data.googleData, data.res)
+  async googleAuth(@Payload() { googleData }) {
+    return this.authService.googleSignIn(googleData)
   }
 
   @MessagePattern({ cmd: 'auth.refreshToken' })
   async handleRefreshToken(
-    @Payload() req
+    @Payload() {user}
   ) {
-    return this.authService.processRefreshToken(req.user)
+    return this.authService.processRefreshToken(user)
   }
 
 }

@@ -26,13 +26,14 @@ export class AuthService {
     }
   }
 
-  async signIn(user: any, response: any) {
+  async signIn(user: any) {
 
     // generate refresh token and access token
     const payload = { sub: user._id, username: user.email, role: user.role };
+    const maxAge = +this.configService.get<string>('JWT_REFRESH_TOKEN_EXPIRES')
     const refresh_token = await this.jwtService.signAsync(payload, {
       secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-      expiresIn: +this.configService.get<string>('JWT_REFRESH_TOKEN_EXPIRES')
+      expiresIn: maxAge
     })
     const access_token = await this.jwtService.signAsync(payload, {
       secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
@@ -41,14 +42,6 @@ export class AuthService {
 
     // update user's refresh_token in DB
     await this.usersService.updateRefreshToken(user._id, refresh_token)
-
-    // add refresh_token into HttpOnly cookie
-    response.cookie('refresh_token', refresh_token, {
-      httpOnly: true,
-      secure: true, // turn true when production, false dev
-      sameSite: 'strict', // 'strict' when production, lax dev
-      maxAge: +this.configService.get<string>('JWT_REFRESH_TOKEN_EXPIRES') * 1000 // in ms
-    });
 
     return {
       // 💡 Here the JWT secret key that's used for signing the payload 
@@ -61,6 +54,8 @@ export class AuthService {
         isActive: user.isActive,
       },
       access_token: access_token,
+      refresh_token,
+      maxAge
     }
   }
 
@@ -85,10 +80,10 @@ export class AuthService {
     }
   }
 
-  async googleSignIn(googleUser: any, response: any) {
+  async googleSignIn(googleUser: any) {
     // Call service that return an user, if user doesn't exist, create one and return user
     const user = await this.usersService.signInOrSignUp(googleUser)
-    return await this.signIn(user, response)
+    return await this.signIn(user)
   }
 
   signUp = async (signUpDto: CreateAuthDto) => {
