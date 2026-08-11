@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { BulkProductDto } from './dto/create-admin.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
 import { UsersService } from '../modules/users/users.service';
-import { ProductsService } from '../modules/products/products.service';
+import { ProductsService } from '../../../product-service/src/modules/products/products.service';
 
 @Injectable()
 export class AdminService {
@@ -31,8 +31,8 @@ export class AdminService {
   // remove(id: number) {
   //   return `This action removes a #${id} admin`;
   // }
-  
-  async getProductsStatistics () {
+
+  async getProductsStatistics() {
     return this.productsService.getStatistics()
   }
 

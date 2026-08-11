@@ -50,6 +50,15 @@
         "tsConfigPath": "apps/nest-app/tsconfig.app.json"
       }
     },
+    "product-service": {
+      "type": "application",
+      "root": "apps/product-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/product-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/product-service/tsconfig.app.json"
+      }
+    },
     "user-service": {
       "type": "application",
       "root": "apps/user-service",

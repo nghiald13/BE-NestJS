@@ -12,6 +12,7 @@ import { LocalStrategy } from './passport/local.strategy';
 import { JwtStrategy } from './passport/jwt-access.strategy';
 import { JwtRefreshStrategy } from './passport/jwt-refresh.strategy';
 import { PassportModule } from '@nestjs/passport';
+import { ProductGatewayController } from './controllers/product.controller';
 
 @Module({
   imports: [
@@ -29,7 +30,7 @@ import { PassportModule } from '@nestjs/passport';
           transport: Transport.TCP,
           options: {
             host: configService.get('HOST'),
-            port: +configService.get('MEDIA_SERVICE_PORT'),
+            port: +configService.get('MEDIA_SERVICE_PORT', 8081),
           }
         }),
         inject: [ConfigService],
@@ -40,17 +41,29 @@ import { PassportModule } from '@nestjs/passport';
           transport: Transport.TCP,
           options: {
             host: configService.get('HOST'),
-            port: +configService.get('AUTH_SERVICE_PORT'),
+            port: +configService.get('AUTH_SERVICE_PORT', 8082),
           }
         }),
         inject: [ConfigService],
+      },
+      {
+        inject: [ConfigService],
+        name: 'PRODUCT_SERVICE',
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.TCP,
+          options: {
+            host: configService.get('HOST'),
+            port: +configService.get('PRODUCT_SERVICE_PORT', 8083)
+          }
+        }),
       },
     ]),
   ],
   controllers: [
     ApiGatewayController,
     MediaGatewayController,
-    AuthGatewayController
+    AuthGatewayController,
+    ProductGatewayController,
   ],
   providers: [
     ApiGatewayService,

@@ -3,7 +3,7 @@ import { PaymentService } from './payment.service';
 import { PaymentController } from './payment.controller';
 import { HttpModule } from '@nestjs/axios';
 import { OrdersModule } from '../modules/orders/orders.module';
-import { ProductsModule } from '../modules/products/products.module';
+import { ProductsModule } from '../../../product-service/src/modules/products/products.module';
 
 
 @Module({

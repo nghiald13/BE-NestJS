@@ -61,4 +61,4 @@ import * as dns from 'dns';
   controllers: [],
   providers: [],
 })
-export class AuthServiceModule {}
+export class AuthServiceModule { }

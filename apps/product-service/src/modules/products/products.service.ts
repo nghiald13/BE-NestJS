@@ -6,7 +6,7 @@ import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, isValidObjectId, Model } from 'mongoose';
 import aqp from 'api-query-params';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
-import { BulkProductDto, BulkProductItemDto } from '../../admin/dto/create-admin.dto';
+import { BulkProductDto, BulkProductItemDto } from '../../../../nest-app/src/admin/dto/create-admin.dto';
 
 @Injectable()
 export class ProductsService {
@@ -21,12 +21,6 @@ export class ProductsService {
     @InjectConnection()
     private readonly connection: Connection,
   ) { }
-
-
-  async create(createProductDto: CreateProductDto) {
-    // await this.productModel.insertMany()
-    return 'This action adds a new product';
-  }
 
   async findAll(query: string, current: number, pageSize: number) {
 
@@ -100,7 +94,7 @@ export class ProductsService {
   // Business function for Basic Detail display (cart)
   async getDetailById(productId: string[]) {
     const result = await this.productModel
-      .find({_id: { $in: productId}})
+      .find({ _id: { $in: productId } })
       .select("-specification -description -status -createdAt -updatedAt")
     return result
   }
@@ -161,7 +155,7 @@ export class ProductsService {
         description: p.description,
         status: "OUT_OF_STOCK"
       }))
-      await this.productModel.insertMany(products, {session})
+      await this.productModel.insertMany(products, { session })
       await session.commitTransaction();
 
       return {

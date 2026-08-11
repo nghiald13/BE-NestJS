@@ -9,7 +9,7 @@ import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Order } from '../modules/orders/schema/order.schema';
 import { Connection, Model } from 'mongoose';
 import { OrderDetails } from '../modules/orders/schema/order_detail.schema';
-import { Product } from '../modules/products/schemas/product.schema';
+import { Product } from '../../../product-service/src/modules/products/schemas/product.schema';
 
 @Injectable()
 export class PaymentService {
