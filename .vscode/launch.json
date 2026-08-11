@@ -47,7 +47,7 @@
             "runtimeExecutable": "npm",
             "runtimeArgs": [
                 "run",
-                "start:debug:media"
+                "start:debug:product"
             ],
             "console": "integratedTerminal",
             "restart": true,
@@ -60,7 +60,8 @@
             "configurations": [
                 "Debug: API Gateway",
                 "Debug: Auth Service",
-                "Debug: Media Service"
+                "Debug: Media Service",
+                "Debug: Product Service",
             ]
         }
     ]

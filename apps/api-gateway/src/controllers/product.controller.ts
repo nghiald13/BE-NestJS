@@ -1,6 +1,6 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Inject } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Inject, HttpCode, HttpStatus } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-import { Public } from '../decorators/decor';
+import { Public, ResponseMessage } from '../decorators/decor';
 import { firstValueFrom } from 'rxjs';
 
 @Controller('products')
@@ -19,7 +19,6 @@ export class ProductGatewayController {
         @Query('current') current: string,
         @Query('pageSize') pageSize: string,
     ) {
-        // return this.productsService.findAll(query, +current, +pageSize);
         return await firstValueFrom(
             this.productClient.send({ cmd: 'product.findAll' }, {
                 query, current, pageSize
@@ -27,28 +26,34 @@ export class ProductGatewayController {
         );
     }
 
-    // @Public()
-    // @Post(`getDetail`)
-    // getDetailById(@Body('productId') productId: string[]) {
-    //     return this.productsService.getDetailById(productId);
-    // }
+    @Public()
+    @Post(`getDetail`)
+    @HttpCode(HttpStatus.OK)
+    @ResponseMessage('Fetch Product Detail for Cart')
+    getDetailById(@Body('productId') productId: string[]) {
+        return this.productClient.send({cmd: 'product.getDetail'}, productId)
+    }
 
-    // @Public()
-    // @Get('meta/manufacturers')
-    // getDistinctManufacturers() {
-    //     return this.productsService.getDistinctManufacturers()
-    // }
+    @Public()
+    @Get('meta/manufacturers')
+    getDistinctManufacturers() {
+        return this.productClient.send({ cmd: 'product.getDistinctManufacturer' }, {})
+    }
 
 
 
 
 
     // ===================== Dynamic Routes =====================
-    // @Public()
-    // @Get(':productId')
-    // findOne(@Param('productId') productId: string) {
-    //     return this.productsService.findOne(productId);
-    // }
+    @Public()
+    @Get(':productId')
+    findOne(
+        @Param('productId') productId: string,
+    ) {
+        return this.productClient.send({ cmd: 'product.findOne' }, {
+            productId,
+        });
+    }
 
     // @Patch(':id')
     // update(@Param('id') id: string, @Body() updateProductDto: UpdateProductDto) {

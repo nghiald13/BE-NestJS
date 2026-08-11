@@ -12,7 +12,7 @@ async function bootstrap() {
         transport: Transport.TCP,
         options: {
           host: configService.get('HOST', 'localhost'),
-          port: +configService.get('PRODUCT_SERVICE_PORT', '8083')
+          port: +configService.get('PRODUCT_SERVICE_PORT', 8083)
         }
       })
     });
