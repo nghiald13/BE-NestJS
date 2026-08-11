@@ -39,6 +39,19 @@
             "console": "integratedTerminal",
             "restart": true,
             "port": 9231
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Debug: Product Service",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run",
+                "start:debug:media"
+            ],
+            "console": "integratedTerminal",
+            "restart": true,
+            "port": 9232
         }
     ],
     "compounds": [
