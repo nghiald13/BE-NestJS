@@ -3,10 +3,11 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { Product, ProductDocument } from './schemas/product.schema';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
-import { Connection, isValidObjectId, Model } from 'mongoose';
+import { Connection, isValidObjectId, Model, Types } from 'mongoose';
 import aqp from 'api-query-params';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { BulkProductDto, BulkProductItemDto } from '../../../../nest-app/src/admin/dto/create-admin.dto';
+import { RpcException } from '@nestjs/microservices';
 
 @Injectable()
 export class ProductsService {
@@ -125,20 +126,54 @@ export class ProductsService {
     return manufacturers
   }
 
-  async getStatistics() {
+  // Business function to get name
+  async getProducts(productId: string[]) {
+    const products = await this.productModel
+      .find({ _id: { $in: productId } })
+      .select('name price')
+      .lean()
 
-    const [stats] = await this.productModel.aggregate([{
-      $group: {
-        _id: null,
-        totalItems: { $sum: 1 },
-        totalInStock: { $sum: { $cond: [{ $eq: ['$status', 'IN_STOCK'] }, 1, 0] } },
-        totalLowStock: { $sum: { $cond: [{ $eq: ['$status', 'LOW_STOCK'] }, 1, 0] } },
-        totalOutOfStock: { $sum: { $cond: [{ $eq: ['$status', 'OUT_OF_STOCK'] }, 1, 0] } },
-      },
-    }]).exec()
-
-    return stats
+    return products
   }
+
+  async reserveStock(items: { productId: Types.ObjectId; quantity: number }[]) {
+    const session = await this.connection.startSession();
+    session.startTransaction();
+    try {
+      for (const item of items) {
+        const updated = await this.productModel.findOneAndUpdate(
+          { _id: item.productId, in_stock: { $gte: item.quantity } },
+          { $inc: { in_stock: -item.quantity } },
+          { session, new: true },
+        );
+        if (!updated) {
+          throw new RpcException(`Sản phẩm ${item.productId} không đủ hàng`);
+        }
+      }
+      await session.commitTransaction();
+      return true;
+    } catch (error: any) {
+      await session.abortTransaction();
+      console.log(error.message);
+    } finally {
+      session.endSession();
+    }
+    return false;
+  }
+
+  async refundStock(items: { productId: Types.ObjectId; quantity: number }[]) {
+
+    const bulkOps = items.map(item => ({
+      updateOne: {
+        filter: { _id: item.productId },
+        update: { $inc: { in_stock: item.quantity } },
+      },
+    }));
+    await this.productModel.bulkWrite(bulkOps);
+    console.log(`Refunded Stock: ${items}`)
+  }
+
+
 
   // Admin Businesses
   async addBulkProduct(bulkProductDto: BulkProductDto) {
@@ -172,4 +207,20 @@ export class ProductsService {
       message: "There was an error while adding products"
     }
   }
+
+
+  async getStatistics() {
+    const [stats] = await this.productModel.aggregate([{
+      $group: {
+        _id: null,
+        totalItems: { $sum: 1 },
+        totalInStock: { $sum: { $cond: [{ $eq: ['$status', 'IN_STOCK'] }, 1, 0] } },
+        totalLowStock: { $sum: { $cond: [{ $eq: ['$status', 'LOW_STOCK'] }, 1, 0] } },
+        totalOutOfStock: { $sum: { $cond: [{ $eq: ['$status', 'OUT_OF_STOCK'] }, 1, 0] } },
+      },
+    }]).exec()
+
+    return stats
+  }
 }
+

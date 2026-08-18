@@ -2,15 +2,17 @@ import { Module } from '@nestjs/common';
 import { PaymentService } from './payment.service';
 import { PaymentController } from './payment.controller';
 import { HttpModule } from '@nestjs/axios';
-import { OrdersModule } from '../modules/orders/orders.module';
-import { ProductsModule } from '../../../product-service/src/modules/products/products.module';
+import { MongooseModule } from '@nestjs/mongoose';
+import { Payment, PaymentSchema } from './schema/payment.schema';
+import { registerMicroserviceClients } from 'libs/microservice-client/register-client';
 
 
 @Module({
   imports: [
     HttpModule,
-    OrdersModule,
-    ProductsModule
+    MongooseModule.forFeature([
+      { name: Payment.name, schema: PaymentSchema }
+    ]),
   ],
   controllers: [PaymentController],
   providers: [PaymentService],

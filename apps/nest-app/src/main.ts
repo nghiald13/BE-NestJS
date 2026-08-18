@@ -10,27 +10,6 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const port = configService.get('PORT')
 
-  //Activates Validation
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,
-    // forbidNonWhitelisted: true,
-    // skipUndefinedProperties: true,
-  }));
-
-  app.setGlobalPrefix('api/v1', {
-    exclude: [
-      '',
-    ]
-  });
-
-  app.enableCors({
-    origin: true,
-    methods: "GET, HEAD, PUT, PATCH, POST, DELETE",
-    preflightContinue: false,
-    credentials: true,
-  });
-
-  app.use(cookieParser())
 
   const config = new DocumentBuilder()
     .setTitle('Cats example')

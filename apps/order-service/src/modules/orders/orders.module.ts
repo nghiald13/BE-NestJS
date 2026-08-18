@@ -3,14 +3,18 @@ import { OrdersService } from './orders.service';
 import { OrdersController } from './orders.controller';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Order, OrderSchema } from './schema/order.schema';
-import { OrderDetails, OrderDetailsSchema } from './schema/order_detail.schema';
+import { registerMicroserviceClients } from 'libs/microservice-client/register-client';
+import { Microservice } from 'libs/enum/microservice.enum';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
-      { name: OrderDetails.name, schema: OrderDetailsSchema },
       { name: Order.name, schema: OrderSchema },
     ]),
+    registerMicroserviceClients([
+      Microservice.PRODUCT_SERVICE,
+      Microservice.PAYMENT_SERVICE,
+    ])
   ],
   controllers: [OrdersController],
   providers: [OrdersService],
@@ -19,4 +23,4 @@ import { OrderDetails, OrderDetailsSchema } from './schema/order_detail.schema';
     OrdersService,
   ]
 })
-export class OrdersModule {}
+export class OrdersModule { }

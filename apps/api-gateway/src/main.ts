@@ -1,21 +1,30 @@
 import { NestFactory } from '@nestjs/core';
 import { ApiGatewayModule } from './api-gateway.module';
-import { AllExceptionsFilter } from './common/rpc-exception.filter';
+import { RpcExceptionFilter } from './common/rpc-exception.filter';
 import cookieParser from 'cookie-parser';
+import { ValidationPipe } from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
   const host: string = process.env.HOST;
   const port: number = +process.env.API_GATEWAY_PORT;
   const app = await NestFactory.create(ApiGatewayModule);
 
-  //Config
+  // Activates Validation
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist: true,
+    // forbidNonWhitelisted: true,
+    // skipUndefinedProperties: true,
+  }));
+
+  // Prefix url
   app.setGlobalPrefix('api/v1', {
     exclude: [
       ''
     ],
   })
 
-  app.useGlobalFilters(new AllExceptionsFilter());
+  app.useGlobalFilters(new RpcExceptionFilter());
 
   app.use(cookieParser())
 
@@ -26,6 +35,14 @@ async function bootstrap() {
     credentials: true,
   });
 
+  const config = new DocumentBuilder()
+    .setTitle('MECSU API')
+    .setDescription('API Gateway for microservices')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, document);
 
   await app.listen(port);
   console.log(`Api Gateway start on ${host}:${port}`);

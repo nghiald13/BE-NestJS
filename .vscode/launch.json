@@ -52,6 +52,32 @@
             "console": "integratedTerminal",
             "restart": true,
             "port": 9232
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Debug: Order Service",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run",
+                "start:debug:order"
+            ],
+            "console": "integratedTerminal",
+            "restart": true,
+            "port": 9233
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Debug: Payment Service",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run",
+                "start:debug:payment"
+            ],
+            "console": "integratedTerminal",
+            "restart": true,
+            "port": 9234
         }
     ],
     "compounds": [
@@ -62,6 +88,8 @@
                 "Debug: Auth Service",
                 "Debug: Media Service",
                 "Debug: Product Service",
+                "Debug: Order Service",
+                "Debug: Payment Service",
             ]
         }
     ]

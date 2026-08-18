@@ -13,6 +13,10 @@ import { JwtStrategy } from './passport/jwt-access.strategy';
 import { JwtRefreshStrategy } from './passport/jwt-refresh.strategy';
 import { PassportModule } from '@nestjs/passport';
 import { ProductGatewayController } from './controllers/product.controller';
+import { OrderGatewayController } from './controllers/order.controller';
+import { PaymentGatewayController } from './controllers/payment.controller';
+import { registerMicroserviceClients } from 'libs/microservice-client/register-client';
+import { Microservice } from 'libs/enum/microservice.enum';
 
 @Module({
   imports: [
@@ -23,47 +27,21 @@ import { ProductGatewayController } from './controllers/product.controller';
 
     PassportModule,
 
-    ClientsModule.registerAsync([
-      {
-        name: 'MEDIA_SERVICE',
-        useFactory: (configService: ConfigService) => ({
-          transport: Transport.TCP,
-          options: {
-            host: configService.get('HOST'),
-            port: +configService.get('MEDIA_SERVICE_PORT', 8081),
-          }
-        }),
-        inject: [ConfigService],
-      },
-      {
-        name: 'AUTH_SERVICE',
-        useFactory: (configService: ConfigService) => ({
-          transport: Transport.TCP,
-          options: {
-            host: configService.get('HOST'),
-            port: +configService.get('AUTH_SERVICE_PORT', 8082),
-          }
-        }),
-        inject: [ConfigService],
-      },
-      {
-        inject: [ConfigService],
-        name: 'PRODUCT_SERVICE',
-        useFactory: (configService: ConfigService) => ({
-          transport: Transport.TCP,
-          options: {
-            host: configService.get('HOST'),
-            port: +configService.get('PRODUCT_SERVICE_PORT', 8083)
-          }
-        }),
-      },
-    ]),
+    registerMicroserviceClients([
+      Microservice.MEDIA_SERVICE,
+      Microservice.AUTH_SERVICE,
+      Microservice.PRODUCT_SERVICE,
+      Microservice.ORDER_SERVICE,
+      Microservice.PAYMENT_SERVICE,
+    ])
   ],
   controllers: [
     ApiGatewayController,
     MediaGatewayController,
     AuthGatewayController,
     ProductGatewayController,
+    OrderGatewayController,
+    PaymentGatewayController,
   ],
   providers: [
     ApiGatewayService,

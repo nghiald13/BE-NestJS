@@ -27,11 +27,11 @@ export class ProductGatewayController {
     }
 
     @Public()
-    @Post(`getDetail`)
+    @Post(`getBriefDetail`)
     @HttpCode(HttpStatus.OK)
-    @ResponseMessage('Fetch Product Detail for Cart')
+    @ResponseMessage('Fetch Product Brief Detail')
     getDetailById(@Body('productId') productId: string[]) {
-        return this.productClient.send({cmd: 'product.getDetail'}, productId)
+        return this.productClient.send({cmd: 'product.get-brief-detail'}, productId)
     }
 
     @Public()

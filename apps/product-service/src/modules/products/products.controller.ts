@@ -1,6 +1,7 @@
 import { Controller } from '@nestjs/common';
 import { ProductsService } from './products.service';
-import { MessagePattern, Payload } from '@nestjs/microservices';
+import { EventPattern, MessagePattern, Payload } from '@nestjs/microservices';
+import { Types } from 'mongoose';
 
 @Controller()
 export class ProductsController {
@@ -20,11 +21,26 @@ export class ProductsController {
     return this.productsService.getDetailById(productId);
   }
 
+  @MessagePattern({ cmd: 'product.getBriefDetail' })
+  async getItem(@Payload() productId: string[]) {
+    return this.productsService.getProducts(productId);
+  }
+
   @MessagePattern({ cmd: 'product.getDistinctManufacturer' })
   getDistinctManufacturers() {
     return this.productsService.getDistinctManufacturers()
   }
 
+  @MessagePattern({ cmd: 'product.reserve' })
+  async reserveStock(@Payload() { items }: { items: { productId: Types.ObjectId; quantity: number }[] }) {
+    return this.productsService.reserveStock(items);
+  }
+
+  // ===================== Events from Order =====================
+  @EventPattern('order.create.failed')
+  async refundStock(@Payload() { items }: { items: { productId: Types.ObjectId; quantity: number }[] }) {
+    return this.productsService.refundStock(items);
+  }
 
 
 

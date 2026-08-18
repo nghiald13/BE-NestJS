@@ -5,8 +5,8 @@ import { CacheModule } from '@nestjs/cache-manager'
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ProductsModule } from '../../product-service/src/modules/products/products.module';
-import { PaymentModule } from './payment/payment.module';
-import { OrdersModule } from './modules/orders/orders.module';
+import { PaymentModule } from '../../payment-service/src/modules/payment/payment.module';
+import { OrdersModule } from '../../order-service/src/modules/orders/orders.module';
 import { AdminModule } from './admin/admin.module';
 import KeyvRedis from '@keyv/redis';
 
