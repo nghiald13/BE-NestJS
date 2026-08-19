@@ -68,7 +68,7 @@ export class PaymentService {
       partnerCode: momoPartnerCode,
       redirectUrl: `${process.env.FRONT_END_BASE_URL}${process.env.FRONT_END_CHECKOUT}`,
       requestId: requestId,
-      requestType: "captureWallet"
+      requestType: "payWithATM"
     }
 
     const signature = this.generateMoMoSignature(queryString.stringify(requestBody, { encode: false }), momoSecretKey)
@@ -79,7 +79,7 @@ export class PaymentService {
         // optional MoMo props
         // items: dto.items
       },
-        { headers: { 'Content-Type': 'application/json' }, }
+        { headers: { 'Content-Type': 'application/json; charset=UTF-8' }, }
       )
     );
 

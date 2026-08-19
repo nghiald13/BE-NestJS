@@ -1,15 +1,110 @@
+
 services:
-  mongodb:
-    image: mongo:latest
-    environment: 
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: GjDctMEfBrnFlLt5
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: api-gateway
+    container_name: api-gateway
     ports:
-      - 27017:27017
-    volumes:
-      - mongodb_data_container:/data/db
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      HOST: 0.0.0.0
+      AUTH_SERVICE_HOST: auth-service
+      ORDER_SERVICE_HOST: order-service
+      PRODUCT_SERVICE_HOST: product-service
+      PAYMENT_SERVICE_HOST: payment-service
+      MEDIA_SERVICE_HOST: media-service
+    depends_on:
+      - auth-service
+      - order-service
+      - product-service
+      - payment-service
+      - media-service
+    networks:
+      - app-network
 
-volumes:
-  mongodb_data_container:
+  auth-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: auth-service
+    container_name: auth-service
+    env_file:
+      - .env
+    environment:
+      HOST: 0.0.0.0
+    networks:
+      - app-network
 
-    #docker compose -p demodb up -d
+  media-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: media-service
+    container_name: media-service
+    env_file:
+      - .env
+    environment:
+      HOST: 0.0.0.0
+    networks:
+      - app-network
+
+  product-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: product-service
+    container_name: product-service
+    env_file:
+      - .env
+    environment:
+      HOST: 0.0.0.0
+    networks:
+      - app-network
+
+  order-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: order-service
+    container_name: order-service
+    env_file:
+      - .env
+    environment:
+      HOST: 0.0.0.0
+      PRODUCT_SERVICE_HOST: product-service
+      PAYMENT_SERVICE_HOST: payment-service
+    depends_on:
+      - product-service
+      - payment-service
+    networks:
+      - app-network
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: payment-service
+    container_name: payment-service
+    env_file:
+      - .env
+    environment:
+      HOST: 0.0.0.0
+    #   ORDER_SERVICE_HOST: order-service
+    # depends_on:
+    #   - order-service
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

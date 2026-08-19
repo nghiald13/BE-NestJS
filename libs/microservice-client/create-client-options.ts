@@ -10,7 +10,7 @@ export function createTcpClientOptions(
     return {
         transport: Transport.TCP,
         options: {
-            host: configService.get<string>(`HOST`),
+            host: configService.get<string>(`${servicePrefix}_HOST`),
             port: configService.get<number>(`${servicePrefix}_PORT`),
         },
     };

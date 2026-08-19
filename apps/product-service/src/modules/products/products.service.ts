@@ -1,13 +1,12 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
-import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { Product, ProductDocument } from './schemas/product.schema';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, isValidObjectId, Model, Types } from 'mongoose';
 import aqp from 'api-query-params';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
-import { BulkProductDto, BulkProductItemDto } from '../../../../nest-app/src/admin/dto/create-admin.dto';
 import { RpcException } from '@nestjs/microservices';
+import { BulkProductDto } from './dto/create-product.dto';
 
 @Injectable()
 export class ProductsService {
