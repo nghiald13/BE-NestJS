@@ -1,25 +1,96 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
         {
             "type": "node",
             "request": "launch",
-            "name": "Nest Debug",
+            "name": "Debug: API Gateway",
             "runtimeExecutable": "npm",
             "runtimeArgs": [
                 "run",
-                "start:debug",
-                "--",
-                "--inspect-brk"
+                "start:debug:gateway"
             ],
             "console": "integratedTerminal",
             "restart": true,
-            "protocol": "auto",
-            "port": 9229,
-            "autoAttachChildProcesses": true
+            "port": 9229
         },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Debug: Auth Service",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run",
+                "start:debug:auth"
+            ],
+            "console": "integratedTerminal",
+            "restart": true,
+            "port": 9230
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Debug: Media Service",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run",
+                "start:debug:media"
+            ],
+            "console": "integratedTerminal",
+            "restart": true,
+            "port": 9231
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Debug: Product Service",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run",
+                "start:debug:product"
+            ],
+            "console": "integratedTerminal",
+            "restart": true,
+            "port": 9232
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Debug: Order Service",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run",
+                "start:debug:order"
+            ],
+            "console": "integratedTerminal",
+            "restart": true,
+            "port": 9233
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Debug: Payment Service",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run",
+                "start:debug:payment"
+            ],
+            "console": "integratedTerminal",
+            "restart": true,
+            "port": 9234
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Debug ALL Microservices",
+            "configurations": [
+                "Debug: API Gateway",
+                "Debug: Auth Service",
+                "Debug: Media Service",
+                "Debug: Product Service",
+                "Debug: Order Service",
+                "Debug: Payment Service",
+            ]
+        }
     ]
 }
