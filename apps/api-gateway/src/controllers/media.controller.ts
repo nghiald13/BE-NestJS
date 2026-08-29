@@ -10,6 +10,6 @@ export class MediaGatewayController {
     @Get('generateUploadSignature')
     @Public()
     getUploadSignature() {
-        return this.mediaClient.send({cmd: 'cloudinary_generate_upload_signature'}, {})
+        return this.mediaClient.send('cloudinary_generate_upload_signature', {})
     }
 }

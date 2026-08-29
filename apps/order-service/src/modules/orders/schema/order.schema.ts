@@ -50,11 +50,9 @@ class OrderItem {
 
 @Schema({ timestamps: true })
 export class Order {
+
     @Prop({ type: Types.ObjectId, ref: 'User', required: false })
     userId: Types.ObjectId;
-
-    @Prop({ required: true, unique: true })
-    orderCode: string;
 
     // Customer's Info
     @Prop({ required: true })

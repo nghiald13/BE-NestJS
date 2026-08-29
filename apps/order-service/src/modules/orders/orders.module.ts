@@ -5,6 +5,9 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Order, OrderSchema } from './schema/order.schema';
 import { registerMicroserviceClients } from 'libs/microservice-client/register-client';
 import { Microservice } from 'libs/enum/microservice.enum';
+import { ClientsModule } from '@nestjs/microservices';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { OutboxModule } from 'apps/outbox/src/outbox.module';
 
 @Module({
   imports: [
@@ -13,8 +16,13 @@ import { Microservice } from 'libs/enum/microservice.enum';
     ]),
     registerMicroserviceClients([
       Microservice.PRODUCT_SERVICE,
-      Microservice.PAYMENT_SERVICE,
-    ])
+      // Microservice.PAYMENT_SERVICE,
+    ]),
+
+    // Outbox - Kafka Module
+    OutboxModule,
+
+
   ],
   controllers: [OrdersController],
   providers: [OrdersService],

@@ -1,16 +1,19 @@
-import { HttpStatus, Inject, Injectable, InternalServerErrorException } from '@nestjs/common';
+import { BadRequestException, HttpStatus, Inject, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { firstValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
 import * as crypto from 'crypto';
 import queryString from 'query-string';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
-import { Connection, Model } from 'mongoose';
+import { Connection, isValidObjectId, Model } from 'mongoose';
 import { ClientProxy, RpcException } from '@nestjs/microservices';
 import { CreateOrderDto } from 'apps/order-service/src/modules/orders/dto/create-order.dto';
 import { Payment } from './schema/payment.schema';
 import { PaymentMethod } from '../../../../../libs/enum/payment.enum';
 import { Types } from 'mongoose';
+import { PaymentAttempt } from './schema/payment_attempt.schema';
+import dayjs, { } from "dayjs";
+import { OutboxDocument, OutboxEvent } from 'apps/outbox/src/schemas/outbox.schema';
 
 @Injectable()
 export class PaymentService {
@@ -21,37 +24,117 @@ export class PaymentService {
     @InjectModel(Payment.name)
     private readonly paymentModel: Model<Payment>,
 
-    // @InjectConnection()
-    // private readonly connection: Connection,
+    @InjectModel(PaymentAttempt.name)
+    private readonly paymentAttemptModel: Model<PaymentAttempt>,
+
+    @Inject('ORDER_SERVICE')
+    private readonly orderClient: ClientProxy,
+
+    @InjectConnection()
+    private readonly connection: Connection,
+
+    @InjectModel(OutboxEvent.name)
+    private readonly outboxModel = Model<OutboxDocument>,
 
   ) { }
 
-  create(data: {
+  async pay(data: { orderId: string, method: PaymentMethod }) {
+    let payment;
+    try {
+      if (!isValidObjectId(data.orderId)) throw new BadRequestException('Invalid Order Id Format!')
+      payment = await this.paymentModel.findOne({
+        orderId: new Types.ObjectId(data.orderId),
+      })
+      if (!payment) throw new BadRequestException('Invalid Order! Order does not exist!')
+    } catch (error: any) {
+      throw new RpcException({
+        statusCode: HttpStatus.BAD_REQUEST,
+        message: error.message
+      })
+    }
+
+    let activeAttempt = await this.paymentAttemptModel.findOne({
+      paymentId: payment._id,
+      method: data.method,
+      status: "PENDING",
+      payUrlExpiresAt: { $gt: new Date() },
+    })
+
+    if (!activeAttempt) {
+      const { payUrl, payUrlExpiresAt } = await this.getPayUrlByPaymentMethod(data.method, { _id: data.orderId, amount: payment.amount })
+      activeAttempt = await this.paymentAttemptModel.create({
+        paymentId: payment._id,
+        method: data.method,
+        amount: payment.amount,
+        payUrl,
+        payUrlExpiresAt,
+        status: "PENDING"
+      })
+    }
+    return activeAttempt.payUrl;
+  }
+
+  async create(data: {
     orderId: string,
-    orderCode: string,
     method: PaymentMethod,
     amount: number,
   }) {
+
+    // Create Payment basic info
+    const payment = await this.paymentModel.create({
+      orderId: new Types.ObjectId(data.orderId),
+      amount: data.amount,
+      remaining: data.amount,
+      status: "PENDING"
+    })
+
+    // Process to get payData (payUrl and expires)
+    let payData: { payUrl: string, payUrlExpiresAt: Date }
+    let status = "PROCESSING"
     switch (data.method) {
       case PaymentMethod.MOMO:
-        return this.momo({_id: data.orderId, orderCode: data.orderCode, amount: data.amount});
-      case PaymentMethod.COD:
-        return this.cod();
+        payData = await this.getMoMoPayUrl({ _id: data.orderId, amount: data.amount });
+
+      case PaymentMethod.ZALOPAY:
+        payData = await this.getZaloPayUrl({ _id: data.orderId, amount: data.amount });
     }
+    if (!payData) {
+      status = "FAILED"
+    }
+    const { payUrl, payUrlExpiresAt } = payData;
+
+    // Create First PaymmentAttempt for Payment
+    const paymentAttempt = await this.paymentAttemptModel.create({
+      paymentId: payment._id,
+      method: data.method,
+      amount: data.amount,
+      payUrl,
+      payUrlExpiresAt,
+      status,
+    })
   }
 
-  private generateMoMoSignature(data: string, secretKey: string): string {
+  private hmacsha256(data: string, secretKey: string): string {
     return crypto
-      .createHmac('sha256', secretKey) // Khởi tạo thuật toán sha256 với secretKey
-      .update(data)                    // Đưa chuỗi dữ liệu vào để băm
-      .digest('hex');                  // Xuất kết quả ra định dạng chuỗi Hex (Hexadecimal)
+      .createHmac('sha256', secretKey)
+      .update(data)
+      .digest('hex');
   }
 
   private cod() {
 
   }
 
-  private async momo(order: { _id: string, orderCode: string, amount: number }) {
+  private getPayUrlByPaymentMethod(method: PaymentMethod, order: {_id: string, amount: number}) {
+    switch (method) {
+      case PaymentMethod.MOMO:
+        return this.getMoMoPayUrl(order);
+      case PaymentMethod.ZALOPAY:
+        return this.getZaloPayUrl(order);
+    }
+  }
+
+  private async getMoMoPayUrl(order: { _id: string, amount: number }) {
     const endpoint = process.env.MOMO_TEST_ENV_URL
     const momoPartnerCode = process.env.MOMO_PARTNER_CODE
     const momoAccessKey = process.env.MOMO_ACCESS_KEY
@@ -63,15 +146,15 @@ export class PaymentService {
       amount: order.amount,
       extraData: "",
       ipnUrl: `${process.env.BACK_END_BASE_URL}/api/v1/payment/checkout`,
-      orderId: order.orderCode,
-      orderInfo: `Thanh toan don ${order.orderCode}`,
+      orderId: order._id,
+      orderInfo: `Thanh toan don ${order._id}`,
       partnerCode: momoPartnerCode,
       redirectUrl: `${process.env.FRONT_END_BASE_URL}${process.env.FRONT_END_CHECKOUT}`,
       requestId: requestId,
-      requestType: "payWithATM"
+      requestType: "captureWallet"
     }
 
-    const signature = this.generateMoMoSignature(queryString.stringify(requestBody, { encode: false }), momoSecretKey)
+    const signature = this.hmacsha256(queryString.stringify(requestBody, { encode: false }), momoSecretKey)
     const response = await firstValueFrom(
       this.httpService.post(endpoint, {
         ...requestBody,
@@ -84,97 +167,123 @@ export class PaymentService {
     );
 
     const momoResult = response.data;
-    if (momoResult && momoResult.payUrl) {
-      try {
-        // Create Payment
-        const payment: Payment = await this.paymentModel.create({
-          method: PaymentMethod.MOMO,
-          amount: order.amount,
-          orderId: new Types.ObjectId(order._id),
-          status: 'PENDING',
-          payUrl: momoResult.payUrl,
-        });
-        return momoResult.payUrl;
-      } catch (error: any) {
-        console.log(`Error while creating payUrl and payment: `, error.message)
-        throw new RpcException(error.message);
-      }
-    } else throw new RpcException('Error while fetching MOMO API!')
+    if (!momoResult || !momoResult?.payUrl)
+      throw new RpcException('Error while fetching MOMO API. Try again later!')
+
+    return {
+      payUrl: momoResult.payUrl,
+      payUrlExpiresAt: new Date(Date.now() + 15 * 60 * 1000), // expires in 15 minutes
+    }
   }
 
-  // async verifyPayment(momoPaymentDto: MomoPaymentDto) {
+  private async getZaloPayUrl(order: { _id: string, amount: number }) {
+    const APP_ID = +process.env.ZP_APP_ID;
+    const KEY1 = process.env.ZP_KEY1;
+    const endpoint = process.env.ZP_API_CREATEORDER;
 
-  //   const momoPartnerCode = process.env.MOMO_PARTNER_CODE
-  //   const momoAccessKey = process.env.MOMO_ACCESS_KEY
-  //   const momoSecretKey = process.env.MOMO_SECRET_KEY
+    // Preprocessing request body
+    const app_time = Date.now();
+    const app_trans_id = `${dayjs().format('YYMMDD')}_${order._id}_${dayjs().format('HHmmss')}`
+    const embed_data = {
+      // redirect_url: `${process.env.FRONT_END_BASE_URL}${process.env.FRONT_END_CHECKOUT}`
+    }
 
-  //   const rawData = {
-  //     accessKey: momoAccessKey,
-  //     amount: momoPaymentDto.amount,
-  //     extraData: momoPaymentDto.extraData,
-  //     message: momoPaymentDto.message,
-  //     orderId: momoPaymentDto.orderId,
-  //     orderInfo: momoPaymentDto.orderInfo,
-  //     orderType: momoPaymentDto.orderType,
-  //     partnerCode: momoPartnerCode,
-  //     payType: momoPaymentDto.payType,
-  //     requestId: momoPaymentDto.requestId,
-  //     responseTime: momoPaymentDto.responseTime,
-  //     resultCode: momoPaymentDto.resultCode,
-  //     transId: momoPaymentDto.transId,
-  //   }
+    // Initialize request body
+    const requestBody = {
+      app_id: APP_ID,
+      app_user: "Test Payment",
+      app_trans_id: app_trans_id,
+      app_time: app_time,
+      expire_duration_seconds: 300,
+      amount: order.amount,
+      item: JSON.stringify([]),
+      description: `Payment for Order ${app_trans_id}`,
+      embed_data: JSON.stringify(embed_data),
+      callback_url: `${process.env.NGROK_HOOK}/api/v1/payment/zalo/callback`,
+      // bank_code: '',
+    }
 
-  //   const signature = this.generateMoMoSignature(
-  //     queryString.stringify(rawData, { encode: false }),
-  //     momoSecretKey
-  //   )
-  //   const signatureFromMomo = momoPaymentDto.signature
+    // sign mac with sha256
+    const hmac_input = `${requestBody.app_id}|${requestBody.app_trans_id}|${requestBody.app_user}|${requestBody.amount}|${requestBody.app_time}|${requestBody.embed_data}|${requestBody.item}`;
+    const mac = this.hmacsha256(hmac_input, KEY1);
 
-  //   if (!(signatureFromMomo === signature)) throw new ForbiddenException("Signature doesn't match")
+    // fetch zalopay api with {requestBody, mac}
+    const response = await firstValueFrom(
+      this.httpService.post(endpoint, {
+        ...requestBody,
+        mac: mac,
+      }, {
+        headers: { 'Content-Type': 'application/json' },
+      }));
 
-  //   const resultCode = Number(momoPaymentDto.resultCode);
-  //   if (resultCode === 0) {
-  //     await this.orderModel.findOneAndUpdate(
-  //       { orderCode: momoPaymentDto.orderId },
-  //       {
-  //         status: 'PAID',
-  //         momoTransId: momoPaymentDto.transId.toString(),
-  //         momoPayType: momoPaymentDto.payType,
-  //         paymentAt: new Date(momoPaymentDto.responseTime)
-  //       }
-  //     );
-  //     console.log(`Đơn hàng ${momoPaymentDto.orderId} giao dịch thành công. Đã cập nhật trạng thái PAID.`);
-  //   } else {
+    // errors handling
+    const result = response.data;
+    if (!result) {
+      throw new RpcException('Error while fetching API!')
+    }
+    if (result.return_code !== 1) {
+      throw new RpcException('Error while getting payUrl link!')
+    }
 
-  //     // Refund product stock (MOCK successful as my UAT MOMO hasn't verified)
-  //     const order = await this.orderModel.findOne({ orderCode: momoPaymentDto.orderId });
-  //     if (order) {
-  //       const orderDetails = await this.orderDetailsModel.find({ orderId: order._id });
-  //       if (orderDetails) {
-  //         const bulkOps = orderDetails.map(item => ({
-  //           updateOne: {
-  //             filter: { _id: item.productId },
-  //             update: { $inc: { stock: item.quantity } }
-  //           }
-  //         }));
-  //         await this.productModel.bulkWrite(bulkOps);
-  //         console.log(`Đã hoàn trả kho thành công cho các sản phẩm của đơn hàng ${momoPaymentDto.orderId}`);
-  //       }
-  //     }
+    // success
+    return {
+      payUrl: result.order_url,
+      payUrlExpiresAt: dayjs().add(5, 'minute').toDate(),
+    };
+  }
 
-  //     // Update order status
-  //     await this.orderModel.findOneAndUpdate(
-  //       { orderCode: momoPaymentDto.orderId },
-  //       {
-  //         status: 'FAILED',
-  //         momoTransId: momoPaymentDto.transId.toString(),
-  //         momoPayType: momoPaymentDto.payType,
-  //         paymentAt: new Date(momoPaymentDto.responseTime)
-  //       }
-  //     );
-  //     console.log(`Đơn hàng ${momoPaymentDto.orderId} bị lỗi/hủy với mã: ${resultCode}. Đã cập nhật FAILED.`);
-  //   }
+  async zaloPayCallbackHandler({ data, mac }: { data: string, mac: string }) {
+    // Revalidate MAC
+    const mac_check = this.hmacsha256(data, process.env.ZP_KEY2);
+    if (mac !== mac_check) {
+      console.log("Invalid mac!")
+      return
+    }
 
-  //   return true;
-  // }
+    const response = JSON.parse(data);
+    // Prepare result to response ZaloPayCallback, default success
+    let result = {
+      return_code: 1,
+      return_message: 'Payment confirmed'
+    }
+
+    // Update order
+    const orderId: string = response.app_trans_id.split('_')[1] // remove 'YYMMDD_' prefix and suffix 'HHmmss'
+
+    const session = await this.connection.startSession();
+    await session.startTransaction();
+    try {
+      // Find corresponding Payment and update its status
+      const payment = await this.paymentModel.findOneAndUpdate({ orderId: new Types.ObjectId(orderId) }, {
+        $inc: {remaining: -response.amount},
+        $set: {status: 'PAID'},
+      }, { session });
+
+      // Find attempt and update attempt
+      await this.paymentAttemptModel.findOneAndUpdate({ paymentId: new Types.ObjectId(payment._id) }, {
+        $set: {
+          transactionId: response.zp_trans_id.toString(),
+          payDate: dayjs(response.server_time).toDate(),
+          status: 'SUCCESS',
+        },
+      }, { session });
+
+      // emit event payment.success to consumers
+      await this.outboxModel.create([{
+        topic: 'payment.success',
+        payload: { orderId, },
+      }], { session });
+
+      await session.commitTransaction();
+    } catch (error: any) {
+      await session.abortTransaction();
+      console.log('Error while updating Payment!')
+      result = {
+        return_code: 0,
+        return_message: 'Try callback'
+      }
+    }
+    await session.endSession();
+    return result;
+  } 
 }

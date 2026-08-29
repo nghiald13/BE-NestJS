@@ -32,6 +32,15 @@
         "tsConfigPath": "apps/auth-service/tsconfig.app.json"
       }
     },
+    "kafka": {
+      "type": "application",
+      "root": "apps/kafka",
+      "entryFile": "main",
+      "sourceRoot": "apps/kafka/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/kafka/tsconfig.app.json"
+      }
+    },
     "media-service": {
       "type": "application",
       "root": "apps/media-service",
@@ -57,6 +66,15 @@
       "sourceRoot": "apps/order-service/src",
       "compilerOptions": {
         "tsConfigPath": "apps/order-service/tsconfig.app.json"
+      }
+    },
+    "outbox": {
+      "type": "application",
+      "root": "apps/outbox",
+      "entryFile": "main",
+      "sourceRoot": "apps/outbox/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/outbox/tsconfig.app.json"
       }
     },
     "payment-service": {

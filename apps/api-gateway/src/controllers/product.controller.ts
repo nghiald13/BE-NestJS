@@ -20,7 +20,7 @@ export class ProductGatewayController {
         @Query('pageSize') pageSize: string,
     ) {
         return await firstValueFrom(
-            this.productClient.send({ cmd: 'product.findAll' }, {
+            this.productClient.send('product.findAll', {
                 query, current, pageSize
             })
         );
@@ -31,13 +31,13 @@ export class ProductGatewayController {
     @HttpCode(HttpStatus.OK)
     @ResponseMessage('Fetch Product Brief Detail')
     getDetailById(@Body('productId') productId: string[]) {
-        return this.productClient.send({cmd: 'product.get-brief-detail'}, productId)
+        return this.productClient.send('product.getBriefDetail', productId)
     }
 
     @Public()
     @Get('meta/manufacturers')
     getDistinctManufacturers() {
-        return this.productClient.send({ cmd: 'product.getDistinctManufacturer' }, {})
+        return this.productClient.send('product.getDistinctManufacturer', {})
     }
 
 
@@ -50,7 +50,7 @@ export class ProductGatewayController {
     findOne(
         @Param('productId') productId: string,
     ) {
-        return this.productClient.send({ cmd: 'product.findOne' }, {
+        return this.productClient.send('product.findOne', {
             productId,
         });
     }

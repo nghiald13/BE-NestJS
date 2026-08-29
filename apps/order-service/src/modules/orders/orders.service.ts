@@ -1,16 +1,21 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
-import { Connection, Model, Types } from 'mongoose';
+import { Connection, isValidObjectId, Model, Types } from 'mongoose';
 import { Order } from './schema/order.schema';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { ClientProxy, RpcException } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
+import { OutboxDocument, OutboxEvent } from 'apps/outbox/src/schemas/outbox.schema';
 
 @Injectable()
 export class OrdersService {
   constructor(
-    @Inject('PAYMENT_SERVICE')
-    private readonly paymentClient: ClientProxy,
+
+    @InjectModel(OutboxEvent.name)
+    private readonly outboxModel = Model<OutboxDocument>,
+
+    // @Inject('PAYMENT_SERVICE')
+    // private readonly paymentClient: ClientProxy,
 
     @Inject('PRODUCT_SERVICE')
     private readonly productClient: ClientProxy,
@@ -43,7 +48,7 @@ export class OrdersService {
   async create(dto: CreateOrderDto) {
     // Get Items brief detail (id, name, price)
     const orderItems = await firstValueFrom(
-      this.productClient.send({ cmd: 'product.getBriefDetail' }, dto.items.map(item => item.productId))
+      this.productClient.send('product.getBriefDetail', dto.items.map(item => item.productId))
     );
     // Map quantities into above items
     const items = dto.items.map(item => {
@@ -71,38 +76,59 @@ export class OrdersService {
       }
     }
     const pricing = getPricing(items);
-    const orderCode = `ORD_${Date.now()}`;
 
     // Reserve Stock
-    const reserved = await firstValueFrom(this.productClient.send({cmd: 'product.reserve'}, {items: dto.items}))
+    const reserved = await firstValueFrom(this.productClient.send('product.reserve', { items: dto.items }))
     if (!reserved) throw new RpcException(reserved.message);
 
+    const session = await this.connection.startSession();
+    await session.startTransaction();
     let order;
     // Insert into DB
     try {
-      order = await this.orderModel.create({
+      order = new this.orderModel({
         userId: new Types.ObjectId(dto.userId),
-        orderCode: orderCode,
         customerInfo: dto.customerInfo,
         items: items,
         pricing: pricing,
         status: 'PENDING_PAYMENT'
-      })
+      });
+      await order.save({ session })
+
+      await this.outboxModel.create([{
+        topic: 'order.created',
+        payload: {
+          method: dto.payMethod,
+          orderId: order._id,
+          amount: pricing.total,
+        },
+      }], { session });
+
+      await session.commitTransaction();
     } catch (error: any) {
-      console.log('Error while creating order! Process to refund stock');
-      // Refund Stock
-      this.productClient.emit('order.create.failed', {items: dto.items});
+      await session.abortTransaction();
+      console.log('Error while creating order! Rollback stock');
+      // Compensate stock
+      await this.outboxModel.create({
+        topic: 'order.create.failed',
+        payload: { items: dto.items },
+      });
       throw new RpcException(error.message);
     }
 
-    // Announce order.created for Payment
-    this.paymentClient.emit('order.created', {
-      method: dto.payMethod,
-      orderId: order._id,
-      orderCode: orderCode,
-      amount: pricing.total,
-    });
-
     return order._id;
+  }
+
+  async paymentSuccessHandler({orderId}: {orderId: string}) {
+    if (!isValidObjectId(orderId)) {
+      console.log('Invalod Order Id Format!')
+      return;
+    }
+    await this.orderModel.findOneAndUpdate({_id: new Types.ObjectId(orderId)}, {
+      $set: {
+        status: 'CONFIRMING',
+      },
+    })
+    console.log(`Order ${orderId} has been paid`)
   }
 }
