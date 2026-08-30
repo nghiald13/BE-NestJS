@@ -19,8 +19,8 @@ export class OrdersController {
   }
 
   @TCPMessage('order.create')
-  create(@Payload() dto: CreateOrderDto) {
-    return this.ordersService.create(dto);
+  create(@Payload() { idempotencyKey, dto }: { idempotencyKey: string, dto: CreateOrderDto }) {
+    return this.ordersService.create({ idempotencyKey, dto });
   }
 
   @KafkaEvent('payment.success')

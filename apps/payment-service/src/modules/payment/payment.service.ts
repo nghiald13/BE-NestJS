@@ -53,6 +53,12 @@ export class PaymentService {
       })
     }
 
+    // Idempotency
+    if (payment.status === 'PAID') throw new RpcException({
+      statusCode: HttpStatus.BAD_REQUEST,
+      message: 'Order has already been paid!'
+    });
+
     let activeAttempt = await this.paymentAttemptModel.findOne({
       paymentId: payment._id,
       method: data.method,
@@ -61,17 +67,28 @@ export class PaymentService {
     })
 
     if (!activeAttempt) {
-      const { payUrl, payUrlExpiresAt } = await this.getPayUrlByPaymentMethod(data.method, { _id: data.orderId, amount: payment.amount })
-      activeAttempt = await this.paymentAttemptModel.create({
-        paymentId: payment._id,
-        method: data.method,
-        amount: payment.amount,
-        payUrl,
-        payUrlExpiresAt,
-        status: "PENDING"
-      })
+      let payData: {payUrl: string, payUrlExpiresAt: Date};
+      let status = 'PENDING';
+      try {
+        payData = await this.getPayUrlByPaymentMethod(data.method, { _id: data.orderId, amount: payment.amount });
+      } catch (error: any) {
+        status = 'FAILED';
+        throw new RpcException(error);
+      } finally {
+        const { payUrl, payUrlExpiresAt } = payData;
+        activeAttempt = await this.paymentAttemptModel.create({
+          paymentId: payment._id,
+          method: data.method,
+          amount: payment.amount,
+          payUrl,
+          payUrlExpiresAt,
+          status,
+        })
+      }
     }
+
     return activeAttempt.payUrl;
+    
   }
 
   async create(data: {
@@ -80,8 +97,12 @@ export class PaymentService {
     amount: number,
   }) {
 
+    // Idempotency check
+    let payment = await this.paymentModel.findOne({ orderId: new Types.ObjectId(data.orderId) });
+    if (payment) return;
+
     // Create Payment basic info
-    const payment = await this.paymentModel.create({
+    payment = await this.paymentModel.create({
       orderId: new Types.ObjectId(data.orderId),
       amount: data.amount,
       remaining: data.amount,
@@ -89,22 +110,17 @@ export class PaymentService {
     })
 
     // Process to get payData (payUrl and expires)
-    let payData: { payUrl: string, payUrlExpiresAt: Date }
-    let status = "PROCESSING"
-    switch (data.method) {
-      case PaymentMethod.MOMO:
-        payData = await this.getMoMoPayUrl({ _id: data.orderId, amount: data.amount });
-
-      case PaymentMethod.ZALOPAY:
-        payData = await this.getZaloPayUrl({ _id: data.orderId, amount: data.amount });
-    }
-    if (!payData) {
-      status = "FAILED"
+    let payData: { payUrl: string, payUrlExpiresAt: Date };
+    let status = "PROCESSING";
+    try {
+      payData = await this.getPayUrlByPaymentMethod(data.method, { _id: data.orderId, amount: data.amount });
+    } catch (error: any) {
+      status = 'FAILED'
     }
     const { payUrl, payUrlExpiresAt } = payData;
 
     // Create First PaymmentAttempt for Payment
-    const paymentAttempt = await this.paymentAttemptModel.create({
+    await this.paymentAttemptModel.create({
       paymentId: payment._id,
       method: data.method,
       amount: data.amount,
@@ -125,7 +141,7 @@ export class PaymentService {
 
   }
 
-  private getPayUrlByPaymentMethod(method: PaymentMethod, order: {_id: string, amount: number}) {
+  private getPayUrlByPaymentMethod(method: PaymentMethod, order: { _id: string, amount: number }) {
     switch (method) {
       case PaymentMethod.MOMO:
         return this.getMoMoPayUrl(order);
@@ -247,17 +263,21 @@ export class PaymentService {
       return_message: 'Payment confirmed'
     }
 
-    // Update order
+    // Update payment
     const orderId: string = response.app_trans_id.split('_')[1] // remove 'YYMMDD_' prefix and suffix 'HHmmss'
+
 
     const session = await this.connection.startSession();
     await session.startTransaction();
     try {
       // Find corresponding Payment and update its status
       const payment = await this.paymentModel.findOneAndUpdate({ orderId: new Types.ObjectId(orderId) }, {
-        $inc: {remaining: -response.amount},
-        $set: {status: 'PAID'},
+        $inc: { remaining: -response.amount },
+        $set: { status: 'PAID' },
       }, { session });
+
+      // Idempotency
+      if (payment.status === 'PAID') throw new Error(`Payment ${payment._id} has already been PAID`);
 
       // Find attempt and update attempt
       await this.paymentAttemptModel.findOneAndUpdate({ paymentId: new Types.ObjectId(payment._id) }, {
@@ -277,7 +297,7 @@ export class PaymentService {
       await session.commitTransaction();
     } catch (error: any) {
       await session.abortTransaction();
-      console.log('Error while updating Payment!')
+      console.log(`Error while updating Payment! Detail: ${error.message}`)
       result = {
         return_code: 0,
         return_message: 'Try callback'
@@ -285,5 +305,5 @@ export class PaymentService {
     }
     await session.endSession();
     return result;
-  } 
+  }
 }

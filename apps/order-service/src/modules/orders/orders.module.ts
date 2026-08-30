@@ -19,6 +19,26 @@ import { OutboxModule } from 'apps/outbox/src/outbox.module';
       // Microservice.PAYMENT_SERVICE,
     ]),
 
+    ClientsModule.registerAsync([{
+      name: Microservice.KAFKA_SERVICE,
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const brokers = configService.get<string>('KAFKA_BROKERS');
+
+        return {
+          options: {
+            client: {
+              clientId: 'order-service-client',
+              brokers: brokers
+            },
+            consumer: {
+              groupId: 'order-client-consumer',
+            }
+          }
+        }
+      }
+    }]),
     // Outbox - Kafka Module
     OutboxModule,
 

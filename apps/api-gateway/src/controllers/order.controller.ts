@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Inject } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Inject, Headers, BadRequestException } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { CreateOrderDto } from 'apps/order-service/src/modules/orders/dto/create-order.dto';
 import { Microservice } from 'libs/enum/microservice.enum';
@@ -18,8 +18,12 @@ export class OrderGatewayController {
     }
 
     @Post('create')
-    create(@Body() dto: CreateOrderDto) {
-        return firstValueFrom(this.orderClient.send('order.create', dto));
+    create(@Headers('X-Idempotency-Key') idempotencyKey: string, @Body() dto: CreateOrderDto) {
+        if (!idempotencyKey) throw new BadRequestException('X-Idempotency-Key header is required!')
+        return firstValueFrom(this.orderClient.send('order.create', {
+            idempotencyKey,
+            dto,
+        }));
     }
 
     // ======================== DYNAMIC ROUTES ========================

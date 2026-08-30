@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, isValidObjectId, Model, Types } from 'mongoose';
 import { Order } from './schema/order.schema';
@@ -6,10 +6,16 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { ClientProxy, RpcException } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
 import { OutboxDocument, OutboxEvent } from 'apps/outbox/src/schemas/outbox.schema';
+import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
+import { RedisService } from 'libs/shared-modules/redis/redis.service';
 
 @Injectable()
 export class OrdersService {
   constructor(
+    private readonly redisService: RedisService,
+
+    @Inject(CACHE_MANAGER)
+    private cacheManager: Cache,
 
     @InjectModel(OutboxEvent.name)
     private readonly outboxModel = Model<OutboxDocument>,
@@ -45,7 +51,19 @@ export class OrdersService {
     return result
   }
 
-  async create(dto: CreateOrderDto) {
+  async create({ idempotencyKey, dto }: { idempotencyKey: string, dto: CreateOrderDto }) {
+
+    // Attempt to get from cache
+    const cacheKey = `order:create:${idempotencyKey}`;
+    const cacheValue: { status: string, orderId: string } = await this.cacheManager.get(cacheKey);
+    if (cacheValue?.orderId) return cacheValue.orderId;
+    // Attempt to cache, if cacheKey existed, handle idempotency
+    const cacheable = await this.redisService.setNLock(cacheKey, { status: 'PROCESSING', }, 30 * 1000);
+    if (!cacheable) throw new RpcException({
+      statusCode: HttpStatus.CONFLICT,
+      message: "Request Order is being processed. Please wait!"
+    });
+
     // Get Items brief detail (id, name, price)
     const orderItems = await firstValueFrom(
       this.productClient.send('product.getBriefDetail', dto.items.map(item => item.productId))
@@ -72,7 +90,7 @@ export class OrdersService {
         tax,
         discount,
         shipping,
-        total: subtotal + tax - discount + shipping
+        total: Math.ceil(subtotal + tax - discount + shipping),
       }
     }
     const pricing = getPricing(items);
@@ -115,16 +133,19 @@ export class OrdersService {
       });
       throw new RpcException(error.message);
     }
-
+    await this.cacheManager.set(cacheKey, {
+      status: 'SUCCESS',
+      orderId: order._id.toString(),
+    });
     return order._id;
   }
 
-  async paymentSuccessHandler({orderId}: {orderId: string}) {
+  async paymentSuccessHandler({ orderId }: { orderId: string }) {
     if (!isValidObjectId(orderId)) {
       console.log('Invalod Order Id Format!')
       return;
     }
-    await this.orderModel.findOneAndUpdate({_id: new Types.ObjectId(orderId)}, {
+    await this.orderModel.findOneAndUpdate({ _id: new Types.ObjectId(orderId) }, {
       $set: {
         status: 'CONFIRMING',
       },
