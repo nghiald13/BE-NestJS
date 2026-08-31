@@ -1,19 +1,19 @@
 import { BadRequestException, HttpStatus, Inject, Injectable, InternalServerErrorException } from '@nestjs/common';
-import { CreatePaymentDto } from './dto/create-payment.dto';
 import { firstValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
-import * as crypto from 'crypto';
 import queryString from 'query-string';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, isValidObjectId, Model } from 'mongoose';
 import { ClientProxy, RpcException } from '@nestjs/microservices';
-import { CreateOrderDto } from 'apps/order-service/src/modules/orders/dto/create-order.dto';
 import { Payment } from './schema/payment.schema';
 import { PaymentMethod } from '../../../../../libs/enum/payment.enum';
 import { Types } from 'mongoose';
 import { PaymentAttempt } from './schema/payment_attempt.schema';
 import dayjs, { } from "dayjs";
 import { OutboxDocument, OutboxEvent } from 'apps/outbox/src/schemas/outbox.schema';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+import { hmacsha256 } from 'libs/hash/hash.algorithm';
 
 @Injectable()
 export class PaymentService {
@@ -35,6 +35,9 @@ export class PaymentService {
 
     @InjectModel(OutboxEvent.name)
     private readonly outboxModel = Model<OutboxDocument>,
+
+    @InjectQueue('PAYMENT_QUEUE')
+    private readonly paymentQueue: Queue,
 
   ) { }
 
@@ -67,28 +70,16 @@ export class PaymentService {
     })
 
     if (!activeAttempt) {
-      let payData: {payUrl: string, payUrlExpiresAt: Date};
-      let status = 'PENDING';
-      try {
-        payData = await this.getPayUrlByPaymentMethod(data.method, { _id: data.orderId, amount: payment.amount });
-      } catch (error: any) {
-        status = 'FAILED';
-        throw new RpcException(error);
-      } finally {
-        const { payUrl, payUrlExpiresAt } = payData;
-        activeAttempt = await this.paymentAttemptModel.create({
-          paymentId: payment._id,
-          method: data.method,
-          amount: payment.amount,
-          payUrl,
-          payUrlExpiresAt,
-          status,
-        })
-      }
+      activeAttempt = await this.createPaymentAttempt({
+        orderId: new Types.ObjectId(data.orderId),
+        paymentId: payment._id,
+        amount: payment.amount,
+        method: data.method,
+      })
     }
 
     return activeAttempt.payUrl;
-    
+
   }
 
   async create(data: {
@@ -108,33 +99,52 @@ export class PaymentService {
       remaining: data.amount,
       status: "PENDING"
     })
-
-    // Process to get payData (payUrl and expires)
-    let payData: { payUrl: string, payUrlExpiresAt: Date };
-    let status = "PROCESSING";
+    console.log(`Payment ${payment._id} created successfully`)
     try {
-      payData = await this.getPayUrlByPaymentMethod(data.method, { _id: data.orderId, amount: data.amount });
+      await this.createPaymentAttempt({
+        orderId: new Types.ObjectId(data.orderId),
+        paymentId: payment._id,
+        method: data.method,
+        amount: data.amount,
+      })
+      console.log(`PaymentAttempt for Payment ${payment._id} created successfully`)
     } catch (error: any) {
-      status = 'FAILED'
+      console.log(`PaymentAttempt for Payment ${payment._id} failed to create, detail: ${error}`)
     }
-    const { payUrl, payUrlExpiresAt } = payData;
-
-    // Create First PaymmentAttempt for Payment
-    await this.paymentAttemptModel.create({
-      paymentId: payment._id,
-      method: data.method,
-      amount: data.amount,
-      payUrl,
-      payUrlExpiresAt,
-      status,
-    })
   }
 
-  private hmacsha256(data: string, secretKey: string): string {
-    return crypto
-      .createHmac('sha256', secretKey)
-      .update(data)
-      .digest('hex');
+  private async createPaymentAttempt({ orderId, paymentId, method, amount }: {
+    orderId: Types.ObjectId,
+    paymentId: Types.ObjectId,
+    method: PaymentMethod,
+    amount: number,
+  }) {
+    let payData: { queryCode: string, payUrl: string, payUrlExpiresAt: Date };
+    let status = 'PENDING';
+    try {
+      payData = await this.getPayUrlByPaymentMethod(method, { _id: orderId.toString(), amount });
+    } catch (error: any) {
+      status = 'FAILED';
+    }
+    const { payUrl, payUrlExpiresAt, queryCode } = payData;
+    const paymentAttempt = await this.paymentAttemptModel.create({
+      paymentId,
+      method,
+      queryCode,
+      amount,
+      payUrl: payUrl ?? null,
+      payUrlExpiresAt: payUrlExpiresAt ?? null,
+      status,
+    })
+    await this.paymentQueue.add('payment.auto-check', {
+      paymentAttemptId: paymentAttempt._id,
+    }, {
+      jobId: `paymentAttempt.auto-check.attempt-${paymentAttempt._id.toString()}`,
+      delay: dayjs(paymentAttempt.payUrlExpiresAt).diff(dayjs()),
+      removeOnComplete: true,
+      removeOnFail: true,
+    })
+    return paymentAttempt;
   }
 
   private cod() {
@@ -170,7 +180,7 @@ export class PaymentService {
       requestType: "captureWallet"
     }
 
-    const signature = this.hmacsha256(queryString.stringify(requestBody, { encode: false }), momoSecretKey)
+    const signature = hmacsha256(queryString.stringify(requestBody, { encode: false }), momoSecretKey)
     const response = await firstValueFrom(
       this.httpService.post(endpoint, {
         ...requestBody,
@@ -187,6 +197,7 @@ export class PaymentService {
       throw new RpcException('Error while fetching MOMO API. Try again later!')
 
     return {
+      queryCode: order._id,
       payUrl: momoResult.payUrl,
       payUrlExpiresAt: new Date(Date.now() + 15 * 60 * 1000), // expires in 15 minutes
     }
@@ -221,7 +232,7 @@ export class PaymentService {
 
     // sign mac with sha256
     const hmac_input = `${requestBody.app_id}|${requestBody.app_trans_id}|${requestBody.app_user}|${requestBody.amount}|${requestBody.app_time}|${requestBody.embed_data}|${requestBody.item}`;
-    const mac = this.hmacsha256(hmac_input, KEY1);
+    const mac = hmacsha256(hmac_input, KEY1);
 
     // fetch zalopay api with {requestBody, mac}
     const response = await firstValueFrom(
@@ -243,6 +254,7 @@ export class PaymentService {
 
     // success
     return {
+      queryCode: app_trans_id,
       payUrl: result.order_url,
       payUrlExpiresAt: dayjs().add(5, 'minute').toDate(),
     };
@@ -250,7 +262,7 @@ export class PaymentService {
 
   async zaloPayCallbackHandler({ data, mac }: { data: string, mac: string }) {
     // Revalidate MAC
-    const mac_check = this.hmacsha256(data, process.env.ZP_KEY2);
+    const mac_check = hmacsha256(data, process.env.ZP_KEY2);
     if (mac !== mac_check) {
       console.log("Invalid mac!")
       return

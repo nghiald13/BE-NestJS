@@ -13,6 +13,9 @@ export class PaymentAttempt {
     @Prop({enum: PaymentMethod})
     method: string;
 
+    @Prop()
+    queryCode: string;
+
     @Prop({ default: null })
     transactionId: string;
 

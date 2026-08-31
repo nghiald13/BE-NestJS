@@ -8,6 +8,7 @@ import { firstValueFrom } from 'rxjs';
 import { OutboxDocument, OutboxEvent } from 'apps/outbox/src/schemas/outbox.schema';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { RedisService } from 'libs/shared-modules/redis/redis.service';
+import dayjs from 'dayjs';
 
 @Injectable()
 export class OrdersService {
@@ -109,7 +110,8 @@ export class OrdersService {
         customerInfo: dto.customerInfo,
         items: items,
         pricing: pricing,
-        status: 'PENDING_PAYMENT'
+        status: 'PENDING_PAYMENT',
+        expiresAt: dayjs().add(10, 'minutes').toDate(),
       });
       await order.save({ session })
 

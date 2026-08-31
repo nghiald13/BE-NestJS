@@ -10,6 +10,8 @@ import { Microservice } from 'libs/enum/microservice.enum';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PaymentAttempt, PaymentAttemptSchema } from './schema/payment_attempt.schema';
 import { OutboxModule } from 'apps/outbox/src/outbox.module';
+import { BullModule } from '@nestjs/bullmq';
+import { PaymentProcessor } from './payment.processor';
 
 
 @Module({
@@ -43,8 +45,14 @@ import { OutboxModule } from 'apps/outbox/src/outbox.module';
       }
     }]),
     OutboxModule,
+    BullModule.registerQueue({
+      name: 'PAYMENT_QUEUE',
+    })
   ],
   controllers: [PaymentController],
-  providers: [PaymentService],
+  providers: [
+    PaymentService,
+    PaymentProcessor,
+  ],
 })
 export class PaymentModule { }

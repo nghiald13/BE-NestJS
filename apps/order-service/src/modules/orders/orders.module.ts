@@ -7,7 +7,9 @@ import { registerMicroserviceClients } from 'libs/microservice-client/register-c
 import { Microservice } from 'libs/enum/microservice.enum';
 import { ClientsModule } from '@nestjs/microservices';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { BullModule } from '@nestjs/bullmq';
 import { OutboxModule } from 'apps/outbox/src/outbox.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -39,8 +41,15 @@ import { OutboxModule } from 'apps/outbox/src/outbox.module';
         }
       }
     }]),
+
     // Outbox - Kafka Module
+    ScheduleModule.forRoot(),
     OutboxModule,
+
+    // BullMQ
+    BullModule.registerQueue({
+      name: 'ORDER_QUEUE',
+    })
 
 
   ],
@@ -49,6 +58,7 @@ import { OutboxModule } from 'apps/outbox/src/outbox.module';
   exports: [
     MongooseModule,
     OrdersService,
+    // OrderProcessor,
   ]
 })
 export class OrdersModule { }

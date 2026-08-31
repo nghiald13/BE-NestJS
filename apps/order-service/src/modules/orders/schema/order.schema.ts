@@ -1,4 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import dayjs from 'dayjs';
 import { HydratedDocument, Types } from 'mongoose';
 
 export type OrderDocument = HydratedDocument<Order>;
@@ -66,9 +67,13 @@ export class Order {
     @Prop({ required: true })
     pricing: Pricing;
 
-    // Trạng thái đơn hàng và phương thức
+    // Status
     @Prop({ type: String, enum: ['PENDING_PAYMENT', 'PAID', 'FAILED', 'CANCELLED'], default: 'PENDING' })
     status: string;
+
+    // Expire At
+    @Prop()
+    expiresAt: Date;
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);

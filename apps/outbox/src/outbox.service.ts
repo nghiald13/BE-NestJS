@@ -1,10 +1,11 @@
-// order-service/src/outbox/outbox-worker.service.ts
+
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 import { ClientKafka } from '@nestjs/microservices';
 import { OutboxEvent, OutboxDocument } from './schemas/outbox.schema';
+import { firstValueFrom, timeout } from 'rxjs';
 
 
 @Injectable()
@@ -18,13 +19,19 @@ export class OutboxWorkerService implements OnModuleInit {
   ) { }
 
   async onModuleInit() {
-    await this.kafkaClient.connect();
+    try {
+      await this.kafkaClient.connect();
+      this.logger.log('Kafka client connected');
+    } catch (err) {
+      this.logger.error('Kafka connect failed', err);
+    }
   }
 
   @Cron('*/3 * * * * *')
   async processOutbox() {
     if (this.isProcessing) return;
     this.isProcessing = true;
+    this.logger.log('Outbox tick running...');
 
     try {
       const pendingEvents = await this.outboxModel
@@ -32,22 +39,33 @@ export class OutboxWorkerService implements OnModuleInit {
         .sort({ createdAt: 1 })
         .limit(50)
         .exec();
+      this.logger.log(`Found ${pendingEvents.length} pending events`);
 
       for (const event of pendingEvents) {
         try {
-          this.kafkaClient.emit(event.topic, event.payload);
+          await firstValueFrom(
+            this.kafkaClient.emit(event.topic, event.payload).pipe(timeout(10000))
+          );
 
           event.sent = true;
           event.sentAt = new Date();
+          event.lastError = undefined;
           await event.save();
 
           this.logger.log(`Published outbox event ${event._id} → topic ${event.topic}`);
         } catch (error: any) {
-          event.retryCount += 1;
-          event.lastError = error.message;
-          await event.save();
+          const message = error?.message ?? String(error);
+          this.logger.error(`Failed to publish outbox event ${event._id}: ${message}`);
 
-          this.logger.error(`Failed to publish outbox event ${event._id}: ${error.message}`);
+          try {
+            event.retryCount += 1;
+            event.lastError = message;
+            await event.save();
+          } catch (saveError: any) {
+            this.logger.error(
+              `Failed to persist retry state for event ${event._id}: ${saveError?.message}`,
+            );
+          }
         }
       }
     } finally {

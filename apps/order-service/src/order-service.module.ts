@@ -2,17 +2,20 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { OrdersModule } from './modules/orders/orders.module';
-import { ClientsModule } from '@nestjs/microservices';
-import { Microservice } from 'libs/enum/microservice.enum';
 import { CacheModule } from '@nestjs/cache-manager';
 import KeyvRedis from 'node_modules/@keyv/redis/dist/index.cjs';
 import { RedisModule } from 'libs/shared-modules/redis/redis.module';
+import { BullMQModule } from 'libs/shared-modules/bullmq/bullmq.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { OutboxModule } from 'apps/outbox/src/outbox.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    
+    
 
     MongooseModule.forRootAsync({
       inject: [ConfigService],
@@ -41,6 +44,9 @@ import { RedisModule } from 'libs/shared-modules/redis/redis.module';
     // RedisClient Module
     RedisModule,
 
+    // BullMQ Module
+    BullMQModule,
+    
     OrdersModule,
   ],
   controllers: [],
