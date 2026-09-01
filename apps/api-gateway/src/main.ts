@@ -24,10 +24,13 @@ async function bootstrap() {
     ],
   })
 
+  // RcpExceptionFilter for Observable Response from microservices
   app.useGlobalFilters(new RpcExceptionFilter());
 
+  // Cookie Parser
   app.use(cookieParser())
 
+  // Enable CORS
   app.enableCors({
     origin: true,
     methods: "GET, HEAD, PUT, PATCH, POST, DELETE",
@@ -35,6 +38,7 @@ async function bootstrap() {
     credentials: true,
   });
 
+  // Swagger
   const config = new DocumentBuilder()
     .setTitle('MECSU API')
     .setDescription('API Gateway for microservices')

@@ -1,6 +1,8 @@
 import { Body, Controller, HttpCode, HttpStatus, Inject, Post } from "@nestjs/common";
 import { ClientProxy } from "@nestjs/microservices";
-import { CreatePaymentDto } from "apps/payment-service/src/modules/payment/dto/create-payment.dto";
+import { PaymentMethod } from "libs/enum/payment.enum";
+import { firstValueFrom } from "rxjs";
+import { Public } from "../decorators/decor";
 
 @Controller('payment')
 export class PaymentGatewayController {
@@ -11,8 +13,15 @@ export class PaymentGatewayController {
 
     ) {}
 
-    // @Post('momo/create')
-    // create(@Body() dto: CreatePaymentDto) {
-    //     return this.paymentClient.send({cmd: 'payment.create'}, dto);
-    // }
+    @Post('pay')
+    pay (@Body() dto: {orderId: string, method: PaymentMethod}) {
+        return firstValueFrom(this.paymentClient.send('payment.pay', dto));
+    }
+
+    @Post('zalo/callback')
+    @Public()
+    @HttpCode(HttpStatus.OK)
+    zaloPayCallback(@Body() {data, mac}: {data: string, mac: string}) {
+        return firstValueFrom(this.paymentClient.send('payment.zalo.callback', {data, mac}));
+    }
 }

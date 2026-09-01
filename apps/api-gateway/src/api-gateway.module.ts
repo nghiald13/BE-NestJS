@@ -33,6 +33,27 @@ import { Microservice } from 'libs/enum/microservice.enum';
       Microservice.PRODUCT_SERVICE,
       Microservice.ORDER_SERVICE,
       Microservice.PAYMENT_SERVICE,
+    ]),
+
+    // KAFKA client register
+    ClientsModule.registerAsync([
+      {
+        name: 'KAFKA_SERVICE',
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.KAFKA,
+          options: {
+            client: {
+              clientId: 'api-gateway',
+              brokers: [configService.get('KAFKA_BROKER', 'localhost:9092')]
+            },
+            consumer: {
+              groupId: 'gateway-consumer'
+            }
+          }
+        }),
+      },
     ])
   ],
   controllers: [

@@ -1,7 +1,8 @@
 import { Controller } from '@nestjs/common';
 import { ProductsService } from './products.service';
-import { EventPattern, MessagePattern, Payload } from '@nestjs/microservices';
+import { EventPattern, MessagePattern, Payload, Transport } from '@nestjs/microservices';
 import { Types } from 'mongoose';
+import { KafkaEvent, TCPMessage } from 'libs/decorator/microservice-pattern.decorator';
 
 @Controller()
 export class ProductsController {
@@ -9,35 +10,35 @@ export class ProductsController {
 
   // ===================== Static Routes =====================
 
-  @MessagePattern({ cmd: 'product.findAll' })
+  @TCPMessage('product.findAll')
   findAll(
     @Payload() { query, current, pageSize }
   ) {
     return this.productsService.findAll(query, +current, +pageSize);
   }
 
-  @MessagePattern({ cmd: 'product.getDetail' })
+  @TCPMessage('product.getDetail')
   getDetailById(@Payload() productId: string[]) {
     return this.productsService.getDetailById(productId);
   }
 
-  @MessagePattern({ cmd: 'product.getBriefDetail' })
+  @TCPMessage('product.getBriefDetail')
   async getItem(@Payload() productId: string[]) {
     return this.productsService.getProducts(productId);
   }
 
-  @MessagePattern({ cmd: 'product.getDistinctManufacturer' })
+  @TCPMessage('product.getDistinctManufacturer')
   getDistinctManufacturers() {
     return this.productsService.getDistinctManufacturers()
   }
 
-  @MessagePattern({ cmd: 'product.reserve' })
+  @TCPMessage('product.reserve')
   async reserveStock(@Payload() { items }: { items: { productId: Types.ObjectId; quantity: number }[] }) {
     return this.productsService.reserveStock(items);
   }
 
   // ===================== Events from Order =====================
-  @EventPattern('order.create.failed')
+  @KafkaEvent('order.create.failed')
   async refundStock(@Payload() { items }: { items: { productId: Types.ObjectId; quantity: number }[] }) {
     return this.productsService.refundStock(items);
   }
@@ -47,7 +48,7 @@ export class ProductsController {
 
   // ===================== Dynamic Routes =====================
 
-  @MessagePattern({ cmd: 'product.findOne' })
+  @TCPMessage('product.findOne')
   findOne(
     @Payload() { productId },
   ) {

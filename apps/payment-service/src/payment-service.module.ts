@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { PaymentModule } from './modules/payment/payment.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { BullMQModule } from 'libs/shared-modules/bullmq/bullmq.module';
 
 @Module({
   imports: [
@@ -15,6 +16,9 @@ import { MongooseModule } from '@nestjs/mongoose';
         uri: configService.get<string>('MONGODB_URI'),
       }),
     }),
+
+    // BullMQ
+    BullMQModule,
   ],
   controllers: [],
   providers: [],
