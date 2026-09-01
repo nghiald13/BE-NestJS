@@ -8,7 +8,7 @@ import { Microservice } from 'libs/enum/microservice.enum';
 import { ClientsModule } from '@nestjs/microservices';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
-import { OutboxModule } from 'apps/outbox/src/outbox.module';
+import { OutboxModule } from 'libs/shared-modules/outbox/src/outbox.module';
 import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({

@@ -39,6 +39,7 @@ async function bootstrap() {
   });
 
   await app.startAllMicroservices();
+  await app.init();
   console.log('========== PAYMENT SERVICE STARTED ==========');
 }
 bootstrap();

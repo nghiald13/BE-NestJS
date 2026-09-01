@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { Product, ProductDocument } from './schemas/product.schema';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
@@ -145,19 +145,19 @@ export class ProductsService {
           { $inc: { in_stock: -item.quantity } },
           { session, new: true },
         );
-        if (!updated) {
-          throw new RpcException(`Sản phẩm ${item.productId} không đủ hàng`);
-        }
+        if (!updated) throw new RpcException({
+          statusCode: HttpStatus.CONFLICT,
+          message: `Product ${item.productId} is out of required stock. Contact supporter for more information!`,
+        });
       }
       await session.commitTransaction();
       return true;
     } catch (error: any) {
       await session.abortTransaction();
-      console.log(error.message);
+      throw error;
     } finally {
       session.endSession();
     }
-    return false;
   }
 
   async refundStock(items: { productId: Types.ObjectId; quantity: number }[]) {

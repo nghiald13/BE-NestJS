@@ -1,4 +1,4 @@
-// api-gateway/src/common/filters/rpc-exception.filter.ts
+
 import {
     ArgumentsHost,
     Catch,

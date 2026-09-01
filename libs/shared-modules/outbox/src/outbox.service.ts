@@ -31,7 +31,7 @@ export class OutboxWorkerService implements OnModuleInit {
   async processOutbox() {
     if (this.isProcessing) return;
     this.isProcessing = true;
-    this.logger.log('Outbox tick running...');
+    // this.logger.log('Outbox tick running...');
 
     try {
       const pendingEvents = await this.outboxModel
@@ -39,7 +39,7 @@ export class OutboxWorkerService implements OnModuleInit {
         .sort({ createdAt: 1 })
         .limit(50)
         .exec();
-      this.logger.log(`Found ${pendingEvents.length} pending events`);
+      // this.logger.log(`Found ${pendingEvents.length} pending events`);
 
       for (const event of pendingEvents) {
         try {

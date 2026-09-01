@@ -10,7 +10,7 @@ import { PaymentMethod } from '../../../../../libs/enum/payment.enum';
 import { Types } from 'mongoose';
 import { PaymentAttempt } from './schema/payment_attempt.schema';
 import dayjs, { } from "dayjs";
-import { OutboxDocument, OutboxEvent } from 'apps/outbox/src/schemas/outbox.schema';
+import { OutboxDocument, OutboxEvent } from 'libs/shared-modules/outbox/src/schemas/outbox.schema';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { hmacsha256 } from 'libs/hash/hash.algorithm';
@@ -143,7 +143,7 @@ export class PaymentService {
       delay: dayjs(paymentAttempt.payUrlExpiresAt).diff(dayjs()),
       removeOnComplete: true,
       removeOnFail: true,
-    })
+    });
     return paymentAttempt;
   }
 
@@ -260,6 +260,7 @@ export class PaymentService {
     };
   }
 
+  // ZaloPay Callback Handler ONLY FOR SUCCESS
   async zaloPayCallbackHandler({ data, mac }: { data: string, mac: string }) {
     // Revalidate MAC
     const mac_check = hmacsha256(data, process.env.ZP_KEY2);
@@ -292,13 +293,16 @@ export class PaymentService {
       if (payment.status === 'PAID') throw new Error(`Payment ${payment._id} has already been PAID`);
 
       // Find attempt and update attempt
-      await this.paymentAttemptModel.findOneAndUpdate({ paymentId: new Types.ObjectId(payment._id) }, {
+      const paymentAttempt = await this.paymentAttemptModel.findOneAndUpdate({ paymentId: new Types.ObjectId(payment._id) }, {
         $set: {
           transactionId: response.zp_trans_id.toString(),
           payDate: dayjs(response.server_time).toDate(),
           status: 'SUCCESS',
         },
       }, { session });
+
+      // Delete delayed job autocheck paymentAttemptId
+      await this.paymentQueue.remove(`paymentAttempt.auto-check.attempt${paymentAttempt._id.toString()}`);
 
       // emit event payment.success to consumers
       await this.outboxModel.create([{
@@ -317,5 +321,66 @@ export class PaymentService {
     }
     await session.endSession();
     return result;
+  }
+
+  // Query Order status as Scheduled job
+  async zaloPayQuery(paymentAttemptId: string) {
+    const paymentAttempt = await this.paymentAttemptModel.findOne({ _id: paymentAttemptId });
+    if (!paymentAttempt) return;
+    const payment = await this.paymentModel.findOne({ _id: paymentAttempt.paymentId });
+    if (!payment) return;
+
+    const key1 = process.env.ZP_KEY1;
+    const endpoint = process.env.ZP_API_QUERYORDER;
+    const app_id = process.env.ZP_APP_ID;
+    const app_trans_id = paymentAttempt.queryCode;
+    const hmac_input = `${app_id}|${app_trans_id}|${key1}`
+    const mac = hmacsha256(hmac_input, key1);
+
+    // query real status from ZaloPay
+    const response = await firstValueFrom(
+      this.httpService.post(endpoint, {
+        app_id,
+        app_trans_id,
+        mac,
+      }, {
+        headers: { 'Content-Type': 'application/json' }
+      })
+    )
+
+    const result = response.data;
+    if (!result) {
+      console.log(`Auto check PaymentAttempt ${paymentAttempt._id.toString()} failed`);
+      return;
+    }
+
+    const session = await this.connection.startSession();
+    await session.startTransaction();
+
+    const { return_code, return_message, sub_return_code, sub_return_message, zp_trans_id, server_time, amount } = result;
+    try {
+      const updated = await this.paymentAttemptModel.updateOne({ _id: paymentAttempt._id }, {
+        $set: {
+          transactionId: zp_trans_id,
+          payDate: server_time,
+          status: return_code === 1 ? 'SUCCESS' : return_code === 3 ? 'PROCESSING' : 'FAILED'
+        }
+      }, { session });
+      if (!updated) throw new Error(`Error while updating PaymentAttempt ${paymentAttempt._id}!`);
+      if (return_code === 1) {
+        await this.paymentModel.updateOne({ _id: paymentAttempt.paymentId }, {
+          $set: {
+            $inc: { amount: -amount },
+            status: 'PAID',
+          }
+        }, { session })
+      }
+      await session.commitTransaction();
+    } catch (error: any) {
+      await session.abortTransaction();
+      console.log(error);
+    } finally {
+      await session.endSession();
+    }
   }
 }

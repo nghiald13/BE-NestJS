@@ -5,7 +5,7 @@ import { Order } from './schema/order.schema';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { ClientProxy, RpcException } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
-import { OutboxDocument, OutboxEvent } from 'apps/outbox/src/schemas/outbox.schema';
+import { OutboxDocument, OutboxEvent } from 'libs/shared-modules/outbox/src/schemas/outbox.schema';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { RedisService } from 'libs/shared-modules/redis/redis.service';
 import dayjs from 'dayjs';
@@ -96,15 +96,13 @@ export class OrdersService {
     }
     const pricing = getPricing(items);
 
-    // Reserve Stock
-    const reserved = await firstValueFrom(this.productClient.send('product.reserve', { items: dto.items }))
-    if (!reserved) throw new RpcException(reserved.message);
-
+    let order, reserved;
     const session = await this.connection.startSession();
     await session.startTransaction();
-    let order;
     // Insert into DB
     try {
+      // Reserve Stock
+      reserved = await firstValueFrom(this.productClient.send('product.reserve', { items: dto.items }))
       order = new this.orderModel({
         userId: new Types.ObjectId(dto.userId),
         customerInfo: dto.customerInfo,
@@ -127,13 +125,15 @@ export class OrdersService {
       await session.commitTransaction();
     } catch (error: any) {
       await session.abortTransaction();
-      console.log('Error while creating order! Rollback stock');
-      // Compensate stock
-      await this.outboxModel.create({
-        topic: 'order.create.failed',
-        payload: { items: dto.items },
-      });
-      throw new RpcException(error.message);
+      console.log('Error while creating order!');
+      // Compensate stock if deducted
+      if (reserved) {
+        console.log(`Rolling back stock due to deduction while creating`)
+        await this.productClient.send('product.refund', {items: dto.items});
+      }
+      // Release cache so can try again
+      await this.redisService.release(cacheKey);
+      throw new RpcException(error);
     }
     await this.cacheManager.set(cacheKey, {
       status: 'SUCCESS',

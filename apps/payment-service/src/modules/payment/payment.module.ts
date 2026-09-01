@@ -9,7 +9,7 @@ import { ClientsModule } from '@nestjs/microservices';
 import { Microservice } from 'libs/enum/microservice.enum';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PaymentAttempt, PaymentAttemptSchema } from './schema/payment_attempt.schema';
-import { OutboxModule } from 'apps/outbox/src/outbox.module';
+import { OutboxModule } from 'libs/shared-modules/outbox/src/outbox.module';
 import { BullModule } from '@nestjs/bullmq';
 import { PaymentProcessor } from './payment.processor';
 
