@@ -18,3 +18,11 @@ export class CreateAuthDto {
     @IsNotEmpty()
     name: string
 }
+
+export class VerifyAuthDto {
+    @IsNotEmpty()
+    email: string;
+
+    @IsNotEmpty()
+    codeId: string;
+}

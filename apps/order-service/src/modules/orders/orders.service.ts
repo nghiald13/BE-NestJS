@@ -2,13 +2,13 @@ import { BadRequestException, HttpStatus, Inject, Injectable } from '@nestjs/com
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, isValidObjectId, Model, Types } from 'mongoose';
 import { Order } from './schema/order.schema';
-import { CreateOrderDto } from './dto/create-order.dto';
 import { ClientProxy, RpcException } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
 import { OutboxDocument, OutboxEvent } from 'libs/shared-modules/outbox/src/schemas/outbox.schema';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { RedisService } from 'libs/shared-modules/redis/redis.service';
 import dayjs from 'dayjs';
+import { CreateOrderDto } from 'libs/shared-modules/dto/order.dto';
 
 @Injectable()
 export class OrdersService {

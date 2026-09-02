@@ -1,12 +1,11 @@
 import { BadRequestException, HttpStatus, Inject, Injectable } from '@nestjs/common';
-import { UpdateProductDto } from './dto/update-product.dto';
-import { Product, ProductDocument } from './schemas/product.schema';
+import { Product } from './schemas/product.schema';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, isValidObjectId, Model, Types } from 'mongoose';
 import aqp from 'api-query-params';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { RpcException } from '@nestjs/microservices';
-import { BulkProductDto } from './dto/create-product.dto';
+import { BulkProductDto } from 'libs/shared-modules/dto/product.dto';
 
 @Injectable()
 export class ProductsService {
@@ -97,14 +96,6 @@ export class ProductsService {
       .find({ _id: { $in: productId } })
       .select("-specification -description -status -createdAt -updatedAt")
     return result
-  }
-
-  update(id: number, updateProductDto: UpdateProductDto) {
-    return `This action updates a #${id} product`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} product`;
   }
 
   async getDistinctManufacturers() {

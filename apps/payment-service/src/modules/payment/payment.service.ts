@@ -1,10 +1,10 @@
-import { BadRequestException, HttpStatus, Inject, Injectable, InternalServerErrorException } from '@nestjs/common';
+import { BadRequestException, HttpStatus, Injectable } from '@nestjs/common';
 import { firstValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
 import queryString from 'query-string';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, isValidObjectId, Model } from 'mongoose';
-import { ClientProxy, RpcException } from '@nestjs/microservices';
+import { RpcException } from '@nestjs/microservices';
 import { Payment } from './schema/payment.schema';
 import { PaymentMethod } from '../../../../../libs/enum/payment.enum';
 import { Types } from 'mongoose';
@@ -26,9 +26,6 @@ export class PaymentService {
 
     @InjectModel(PaymentAttempt.name)
     private readonly paymentAttemptModel: Model<PaymentAttempt>,
-
-    @Inject('ORDER_SERVICE')
-    private readonly orderClient: ClientProxy,
 
     @InjectConnection()
     private readonly connection: Connection,
