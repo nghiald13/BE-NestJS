@@ -18,7 +18,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     ]),
     registerMicroserviceClients([
       Microservice.PRODUCT_SERVICE,
-      // Microservice.PAYMENT_SERVICE,
+      Microservice.PAYMENT_SERVICE,
     ]),
 
     ClientsModule.registerAsync([{

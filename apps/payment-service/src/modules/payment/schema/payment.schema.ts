@@ -1,4 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { PaymentStatus } from 'libs/enum/payment.enum';
 import { HydratedDocument, Types } from 'mongoose';
 
 export type PaymentDocument = HydratedDocument<Payment>;
@@ -16,6 +17,9 @@ export class Payment {
 
     @Prop({ default: 'PENDING' })
     status: string;
+
+    @Prop({enum: PaymentStatus, default: null})
+    expiresAt: Date;
 }
 
 export const PaymentSchema = SchemaFactory.createForClass(Payment);

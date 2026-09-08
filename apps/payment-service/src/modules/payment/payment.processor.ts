@@ -15,8 +15,10 @@ export class PaymentProcessor extends WorkerHost {
 
     process(job: Job, token?: string): Promise<any> {
         switch (job.name) {
-            case 'payment.auto-check':
+            case 'paymentAttempt.auto-check':
                 return this.checkPaymentAttemptStatus(job.data);
+            case 'payment.finalizing':
+                return this.paymentFinalizing(job.data);
             default:
                 this.logger.warn(`Không tìm thấy Handler cho Job: ${job.name}`);
                 break;
@@ -26,8 +28,12 @@ export class PaymentProcessor extends WorkerHost {
 
 
     // Auto methods
-    private async checkPaymentAttemptStatus({ paymentAttemptId }: { paymentAttemptId: Types.ObjectId }) {
+    private checkPaymentAttemptStatus({ paymentAttemptId }: { paymentAttemptId: Types.ObjectId }) {
         return this.paymentService.zaloPayQuery(paymentAttemptId.toString());
+    }
+
+    private paymentFinalizing({paymentId}: {paymentId: string}) {
+        return this.paymentService.paymentFinalizing(paymentId);
     }
 
 }

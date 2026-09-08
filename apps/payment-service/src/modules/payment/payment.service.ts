@@ -6,7 +6,7 @@ import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, isValidObjectId, Model } from 'mongoose';
 import { RpcException } from '@nestjs/microservices';
 import { Payment } from './schema/payment.schema';
-import { PaymentMethod } from '../../../../../libs/enum/payment.enum';
+import { PaymentAttemptStatus, PaymentMethod, PaymentStatus } from '../../../../../libs/enum/payment.enum';
 import { Types } from 'mongoose';
 import { PaymentAttempt } from './schema/payment_attempt.schema';
 import dayjs, { } from "dayjs";
@@ -38,6 +38,15 @@ export class PaymentService {
 
   ) { }
 
+  async queryStatus(orderId: string) {
+    const payment = await this.paymentModel
+      .findOne({orderId: new Types.ObjectId(orderId)})
+      .select('status')
+      .lean()
+
+    return payment.status;
+  }
+
   async pay(data: { orderId: string, method: PaymentMethod }) {
     let payment;
     try {
@@ -54,15 +63,19 @@ export class PaymentService {
     }
 
     // Idempotency
-    if (payment.status === 'PAID') throw new RpcException({
+    if (payment.status === PaymentStatus.PAID) throw new RpcException({
       statusCode: HttpStatus.BAD_REQUEST,
       message: 'Order has already been paid!'
     });
+    if (payment.status === PaymentStatus.FINALIZING) throw new RpcException({
+      statusCode: HttpStatus.CONFLICT,
+      message: 'Current payment is being finalized! Do not attempt any further!'
+    })
 
     let activeAttempt = await this.paymentAttemptModel.findOne({
       paymentId: payment._id,
       method: data.method,
-      status: "PENDING",
+      status: PaymentAttemptStatus.PROCESSING,
       payUrlExpiresAt: { $gt: new Date() },
     })
 
@@ -94,9 +107,22 @@ export class PaymentService {
       orderId: new Types.ObjectId(data.orderId),
       amount: data.amount,
       remaining: data.amount,
-      status: "PENDING"
+      status: PaymentStatus.PENDING,
+      expiresAt: dayjs().add(10, 'minutes').toDate(),
     })
     console.log(`Payment ${payment._id} created successfully`)
+
+    // Add scheduled job: payment.finalizing
+    await this.paymentQueue.add('payment.finalizing', {
+      paymentId: payment._id.toString(),
+    }, {
+      jobId: `payment.finalizing:${payment._id.toString()}`,
+      delay: dayjs(payment.expiresAt).diff(dayjs()),
+      removeOnComplete: true,
+      removeOnFail: true,
+    })
+
+    // Create first payment attempt for this payment
     try {
       await this.createPaymentAttempt({
         orderId: new Types.ObjectId(data.orderId),
@@ -117,11 +143,11 @@ export class PaymentService {
     amount: number,
   }) {
     let payData: { queryCode: string, payUrl: string, payUrlExpiresAt: Date };
-    let status = 'PENDING';
+    let status = PaymentAttemptStatus.PROCESSING;
     try {
       payData = await this.getPayUrlByPaymentMethod(method, { _id: orderId.toString(), amount });
     } catch (error: any) {
-      status = 'FAILED';
+      status = PaymentAttemptStatus.FAILED;
     }
     const { payUrl, payUrlExpiresAt, queryCode } = payData;
     const paymentAttempt = await this.paymentAttemptModel.create({
@@ -133,7 +159,7 @@ export class PaymentService {
       payUrlExpiresAt: payUrlExpiresAt ?? null,
       status,
     })
-    await this.paymentQueue.add('payment.auto-check', {
+    await this.paymentQueue.add('paymentAttempt.auto-check', {
       paymentAttemptId: paymentAttempt._id,
     }, {
       jobId: `paymentAttempt.auto-check.attempt-${paymentAttempt._id.toString()}`,
@@ -274,23 +300,14 @@ export class PaymentService {
     }
 
     // Update payment
-    const orderId: string = response.app_trans_id.split('_')[1] // remove 'YYMMDD_' prefix and suffix 'HHmmss'
+    const queryCode: string = response.app_trans_id
 
 
     const session = await this.connection.startSession();
     await session.startTransaction();
     try {
-      // Find corresponding Payment and update its status
-      const payment = await this.paymentModel.findOneAndUpdate({ orderId: new Types.ObjectId(orderId) }, {
-        $inc: { remaining: -response.amount },
-        $set: { status: 'PAID' },
-      }, { session });
-
-      // Idempotency
-      if (payment.status === 'PAID') throw new Error(`Payment ${payment._id} has already been PAID`);
-
       // Find attempt and update attempt
-      const paymentAttempt = await this.paymentAttemptModel.findOneAndUpdate({ paymentId: new Types.ObjectId(payment._id) }, {
+      const paymentAttempt = await this.paymentAttemptModel.findOneAndUpdate({ queryCode }, {
         $set: {
           transactionId: response.zp_trans_id.toString(),
           payDate: dayjs(response.server_time).toDate(),
@@ -298,13 +315,20 @@ export class PaymentService {
         },
       }, { session });
 
+      // Find corresponding Payment and update its status
+      const payment = await this.paymentModel.findOneAndUpdate({ _id: paymentAttempt.paymentId }, {
+        $inc: { remaining: -response.amount },
+        $set: { status: 'PAID' },
+      }, { session });
+
       // Delete delayed job autocheck paymentAttemptId
-      await this.paymentQueue.remove(`paymentAttempt.auto-check.attempt${paymentAttempt._id.toString()}`);
+      await this.paymentQueue.remove(`paymentAttempt.auto-check.attempt-${paymentAttempt._id.toString()}`);
+      // Delete scheduled job: paymenmt.finalizing:${paymentId}
 
       // emit event payment.success to consumers
       await this.outboxModel.create([{
         topic: 'payment.success',
-        payload: { orderId, },
+        payload: { orderId: payment.orderId.toString() },
       }], { session });
 
       await session.commitTransaction();
@@ -318,6 +342,22 @@ export class PaymentService {
     }
     await session.endSession();
     return result;
+  }
+
+  // Scheduled Job: Payment Finalizing (trigger when payment expiresAt hits)
+  async paymentFinalizing(paymentId: string) {
+    // Check whether any attempts in processing status
+    const processingAttempts: boolean = await this.paymentAttemptModel.countDocuments({
+      paymentId: new Types.ObjectId(paymentId),
+      status: PaymentAttemptStatus.PROCESSING,
+    }) > 0;
+
+    // If any attempts processing, update status
+    if (processingAttempts) {
+      const updated = await this.paymentModel.findOneAndUpdate({ _id: new Types.ObjectId(paymentId) }, {
+        $set: { status: PaymentStatus.FINALIZING }
+      })
+    }
   }
 
   // Query Order status as Scheduled job
@@ -360,7 +400,10 @@ export class PaymentService {
         $set: {
           transactionId: zp_trans_id,
           payDate: server_time,
-          status: return_code === 1 ? 'SUCCESS' : return_code === 3 ? 'PROCESSING' : 'FAILED'
+          status:
+            return_code === 1 ? PaymentAttemptStatus.SUCCESS :
+              return_code === 3 ? PaymentAttemptStatus.PROCESSING :
+                PaymentAttemptStatus.FAILED,
         }
       }, { session });
       if (!updated) throw new Error(`Error while updating PaymentAttempt ${paymentAttempt._id}!`);
@@ -368,7 +411,13 @@ export class PaymentService {
         await this.paymentModel.updateOne({ _id: paymentAttempt.paymentId }, {
           $set: {
             $inc: { amount: -amount },
-            status: 'PAID',
+            status: PaymentStatus.PAID,
+          }
+        }, { session })
+      } else if (return_code === 2 && payment.status === PaymentStatus.FINALIZING) {
+        await this.paymentModel.updateOne({ _id: paymentAttempt.paymentId }, {
+          $set: {
+            status: PaymentStatus.CANCELLED,
           }
         }, { session })
       }

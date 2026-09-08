@@ -55,7 +55,7 @@ export class CreateOrderDto {
     @Type(() => ItemDto)
     items: ItemDto[];
 
-    @ApiProperty({ example: 'MOMO', description: `Must be in following enum: ${PaymentMethod}` })
+    @ApiProperty({ example: 'MOMO', description: `Must be in following enum: ${Object.keys(PaymentMethod)}` })
     @IsEnum(PaymentMethod)
     @IsNotEmpty()
     payMethod: PaymentMethod;
