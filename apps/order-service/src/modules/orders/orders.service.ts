@@ -114,7 +114,7 @@ export class OrdersService {
         customerInfo: dto.customerInfo,
         items: items,
         pricing: pricing,
-        status: 'PENDING_PAYMENT',
+        status: OrderStatus.PAYMENTPENDING,
         expiresAt: dayjs().add(13, 'minutes').toDate(),
       });
       await order.save({ session });
@@ -123,7 +123,7 @@ export class OrdersService {
       await this.orderQueue.add('order.auto-Check', {
         orderId: order._id.toString()
       }, {
-        jobId: `order.auto-check:${order._id.toString()}`,
+        jobId: `order.auto-check-${order._id.toString()}`,
         delay: dayjs(order.expiresAt).diff(dayjs()),
         removeOnComplete: true,
         removeOnFail: true,
@@ -166,7 +166,7 @@ export class OrdersService {
     }
     await this.orderModel.findOneAndUpdate({ _id: new Types.ObjectId(orderId) }, {
       $set: {
-        status: 'CONFIRMING',
+        status: OrderStatus.CONFIRMING,
       },
     })
     console.log(`Order ${orderId} has been paid`)

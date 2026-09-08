@@ -2,10 +2,9 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { cmpPassword } from '../../common/utilities';
 import { JwtService } from '@nestjs/jwt';
-import { CreateAuthDto } from './dto/create-auth.dto';
-import { VerifyAuthDto } from './dto/update-auth.dto';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../users/users.service';
+import { CreateAuthDto, VerifyAuthDto } from 'libs/shared-modules/dto/auth.dto';
 
 @Injectable()
 export class AuthService {

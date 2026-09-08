@@ -2,27 +2,28 @@ services:
   # ===== KAFKA =====
   kafka:
     image: apache/kafka:latest
+    container_name: kafka
     ports:
       - "9092:9092"
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://kafka:29092,CONTROLLER://kafka:29093,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093,PLAINTEXT_HOST://0.0.0.0:9092
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
-      # CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     volumes:
       - kafka_data:/var/lib/kafka/data
     healthcheck:
-      test: [ "CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server 127.0.0.1:9092 || exit 1" ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
+      test: [ "CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/9092' || exit 1" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     networks:
       - app-network
 
@@ -40,21 +41,28 @@ services:
       - .env
     environment:
       HOST: 0.0.0.0
-      KAFKA_BROKER: kafka:29092
+      KAFKA_BROKERS: kafka:29092
       AUTH_SERVICE_HOST: auth-service
       ORDER_SERVICE_HOST: order-service
       PRODUCT_SERVICE_HOST: product-service
       PAYMENT_SERVICE_HOST: payment-service
       MEDIA_SERVICE_HOST: media-service
     depends_on:
-      - kafka
-      - auth-service
-      - order-service
-      - product-service
-      - payment-service
-      - media-service
+      kafka:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      order-service:
+        condition: service_started
+      product-service:
+        condition: service_started
+      payment-service:
+        condition: service_started
+      media-service:
+        condition: service_started
     networks:
       - app-network
+    restart: on-failure
 
   # ===== Auth Service =====
   auth-service:
@@ -70,6 +78,7 @@ services:
       HOST: 0.0.0.0
     networks:
       - app-network
+    restart: on-failure
 
   # ===== Media Service =====
   media-service:
@@ -85,6 +94,7 @@ services:
       HOST: 0.0.0.0
     networks:
       - app-network
+    restart: on-failure
 
   # ===== Product Service =====
   product-service:
@@ -98,11 +108,13 @@ services:
       - .env
     environment:
       HOST: 0.0.0.0
-      KAFKA_BROKER: kafka:29092
+      KAFKA_BROKERS: kafka:29092
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
     networks:
       - app-network
+    restart: on-failure
 
   # ===== Order Service =====
   order-service:
@@ -117,14 +129,15 @@ services:
     environment:
       HOST: 0.0.0.0
       PRODUCT_SERVICE_HOST: product-service
-      # PAYMENT_SERVICE_HOST: payment-service
-      KAFKA_BROKER: kafka:29092
+      KAFKA_BROKERS: kafka:29092
     depends_on:
-      # - product-service
-      # - payment-service
-      - kafka
+      kafka:
+        condition: service_healthy
+      product-service:
+        condition: service_started
     networks:
       - app-network
+    restart: on-failure
 
   # ===== Payment Service =====
   payment-service:
@@ -138,13 +151,13 @@ services:
       - .env
     environment:
       HOST: 0.0.0.0
-      KAFKA_BROKER: kafka:29092
-    #   ORDER_SERVICE_HOST: order-service
+      KAFKA_BROKERS: kafka:29092
     depends_on:
-      - kafka
-    #   - order-service
+      kafka:
+        condition: service_healthy
     networks:
       - app-network
+    restart: on-failure
 
 networks:
   app-network:
