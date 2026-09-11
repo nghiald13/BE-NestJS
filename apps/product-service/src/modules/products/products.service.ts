@@ -152,6 +152,11 @@ export class ProductsService {
   }
 
   async refundStock(items: { productId: Types.ObjectId; quantity: number }[]) {
+    
+    if (!items) {
+      console.log(`There were no items deducted while creating order!`);
+      return;
+    }
 
     const bulkOps = items.map(item => ({
       updateOne: {

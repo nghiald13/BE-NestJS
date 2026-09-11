@@ -38,7 +38,7 @@ export class ProductsController {
   }
 
   // ===================== Events from Order =====================
-  @TCPMessage('product.refund')
+  @KafkaEvent('order.create.failed')
   async refundStock(@Payload() { items }: { items: { productId: Types.ObjectId; quantity: number }[] }) {
     return this.productsService.refundStock(items);
   }

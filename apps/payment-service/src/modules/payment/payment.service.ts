@@ -40,7 +40,7 @@ export class PaymentService {
 
   async queryStatus(orderId: string) {
     const payment = await this.paymentModel
-      .findOne({orderId: new Types.ObjectId(orderId)})
+      .findOne({ orderId: new Types.ObjectId(orderId) })
       .select('status')
       .lean()
 
@@ -409,16 +409,12 @@ export class PaymentService {
       if (!updated) throw new Error(`Error while updating PaymentAttempt ${paymentAttempt._id}!`);
       if (return_code === 1) {
         await this.paymentModel.updateOne({ _id: paymentAttempt.paymentId }, {
-          $set: {
-            $inc: { amount: -amount },
-            status: PaymentStatus.PAID,
-          }
+          $inc: { amount: -amount },
+          $set: { status: PaymentStatus.PAID },
         }, { session })
       } else if (return_code === 2 && payment.status === PaymentStatus.FINALIZING) {
         await this.paymentModel.updateOne({ _id: paymentAttempt.paymentId }, {
-          $set: {
-            status: PaymentStatus.CANCELLED,
-          }
+          $set: { status: PaymentStatus.CANCELLED }
         }, { session })
       }
       await session.commitTransaction();

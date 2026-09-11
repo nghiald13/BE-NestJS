@@ -1,4 +1,4 @@
-import { BadRequestException, HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, isValidObjectId, Model, Types } from 'mongoose';
 import { Order } from './schema/order.schema';
@@ -144,10 +144,13 @@ export class OrdersService {
       await session.abortTransaction();
       console.log('Error while creating order!');
       // Compensate stock if deducted
-      if (reserved) {
-        console.log(`Rolling back stock due to deduction while creating`)
-        await this.productClient.send('product.refund', { items: dto.items });
-      }
+      console.log(`Rolling back ${reserved ? dto.items.length : 0} items due to deduction while creating`)
+      await this.outboxModel.create({
+        topic: `order.create.failed`,
+        payload: {
+          items: reserved ? dto.items : null
+        }
+      });
       // Release cache so can try again
       await this.redisService.release(cacheKey);
       throw new RpcException(error);
@@ -186,8 +189,7 @@ export class OrdersService {
         payload: {},
       })
     } else if (paymentStatus === PaymentStatus.FINALIZING) {
-      // delay this another 2 mins
-      // await this.orderQueue.getJob(`order.auto-check:${orderId}`).delay
+      throw new ConflictException(`Order ${orderId} has Payment finalizing. Delay the job another 2 min!`)
     }
 
   }
