@@ -9,8 +9,7 @@ import { MailerService } from '@nestjs-modules/mailer';
 import { generate, generateSecret, verify } from 'otplib';
 import { v4 as uuidv4 } from 'uuid';
 import { hashPasswordHelper } from '../../common/utilities';
-import { CreateAuthDto } from '../auth/dto/create-auth.dto';
-import { VerifyAuthDto } from '../auth/dto/update-auth.dto';
+import { CreateAuthDto, VerifyAuthDto } from 'libs/shared-modules/dto/auth.dto';
 
 @Injectable()
 export class UsersService {

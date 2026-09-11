@@ -1,260 +1,138 @@
-# MECSU Backend
+# E-Commerce Microservices Platform
 
-RESTful APIs built with **NestJS** and **MongoDB**. This project serves as the core engine handling user authentication, product management, order processing, and payment for frontend integration.
+A backend e-commerce system built with **NestJS microservices**, demonstrating event-driven architecture, distributed transaction handling, and reliable asynchronous payment processing.
 
-## Getting Started
+> Personal project — built to practice real-world backend patterns used in production distributed systems.
 
-Follow these instructions to set up the MECSU Backend project locally on your machine for development and testing.
+---
+
+## 🏗️ Architecture
+
+```
+                        ┌──────────────────┐
+                        │   API Gateway    │
+                        └────────┬─────────┘
+                                 │ TCP
+        ┌─────────────┬──────────┼──────────┬──────────────┐
+        │             │          │          │              │
+   ┌────▼───┐   ┌─────▼────┐┌────▼───┐┌─────▼────┐  ┌──────▼─────┐
+   │  Auth  │   │  Order   ││Product ││ Payment  │  │   Media    │
+   │Service │   │ Service  ││Service ││ Service  │  │  Service   │
+   └────────┘   └────┬─────┘└───┬────┘└────┬─────┘  └────────────┘
+                     │          │          │
+                     └──────  Kafka ───────┘
+                     (order.created, payment.success,
+                      order.cancelled, ...)
+```
+
+- **Synchronous communication** (TCP): direct request/response calls between services (e.g. Order → Product for stock reservation and price lookup).
+- **Asynchronous communication** (Kafka): domain events published via the **Outbox Pattern**, consumed by downstream services (e.g. Payment Service listens to `order.created`).
+
+---
+
+## ⚙️ Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | NestJS monorepo (multi-app microservices) |
+| Messaging | Apache Kafka (`kafkajs`) |
+| Database | MongoDB (Mongoose, with transactions/sessions) |
+| Caching / Locking | Redis (`ioredis`, `cache-manager`, `@keyv/redis`) — distributed lock for idempotency |
+| Job Scheduling | BullMQ, NestJS CronJob |
+| Authentication | JWT (`@nestjs/jwt`, `passport-jwt`), Google OAuth2 (`passport-google-oauth20`), 2FA (`otplib`) |
+| Media Storage | Cloudinary |
+| Email | Nodemailer + Handlebars templates (`@nestjs-modules/mailer`) |
+| Payment Gateway | ZaloPay |
+| API Documentation | Swagger (`@nestjs/swagger`) |
+| Containerization | Docker & Docker Compose |
+
+---
+
+## ✨ Key Engineering Highlights
+
+This project focuses on solving real distributed-systems problems rather than just wiring up CRUD endpoints:
+
+- **Idempotent order creation** — Redis distributed lock (`setNLock`) + result caching prevent duplicate orders and double stock deduction from retried or double-submitted requests.
+- **Saga-style compensation** — if order creation fails *after* stock has been reserved, a compensating event (`order.create.failed`) is emitted to roll back the reservation, keeping Order and Product services consistent without a distributed transaction coordinator.
+- **Transactional outbox pattern** — domain events (`order.created`, `payment.success`, `order.cancelled`) are written to an outbox collection inside the same MongoDB transaction as the business data, guaranteeing at-least-once event delivery even if the service crashes right after committing.
+- **Payment reconciliation** — scheduled jobs (BullMQ) automatically re-query ZaloPay for payment status when webhooks are delayed or missing, so the system doesn't rely solely on callbacks.
+- **Callback signature verification** — ZaloPay callbacks are validated via HMAC-SHA256 MAC before being trusted, preventing spoofed payment confirmations.
+- **Expiry-driven state machines** — orders and payments carry `expiresAt` timestamps with matching auto-check jobs, so pending states resolve automatically (`PAYMENTPENDING → CANCELLED/PAID`, `PENDING → FINALIZING`, etc.) without manual intervention.
+
+---
+
+## 🧩 Services
+
+| Service | Responsibility |
+|---|---|
+| `api-gateway` | Entry point, routes requests to internal services |
+| `auth-service` | Authentication / authorization |
+| `product-service` | Product catalog, stock reservation |
+| `order-service` | Order lifecycle, pricing, orchestration |
+| `payment-service` | Payment creation, ZaloPay integration, reconciliation |
+| `media-service` | Media/file handling |
+
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
+- Docker & Docker Compose
+- Node.js (for local development outside containers)
 
-Before you begin, ensure you have the following installed:
-- [Node.js](https://nodejs.org/) (v18 or higher recommended, optimized for v25+)
-- [npm](https://www.npmjs.com/) (installed automatically with Node.js)
-- [MongoDB](https://www.mongodb.com/) (Local instance or MongoDB Atlas cluster)
-- [Redis Server](https://redis.io/) (Required for caching features)
+### Run with Docker Compose
 
-### Installation & Configuration
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/nghiald13/BE-NestJS.git
-   cd BE-NestJS
-   ```
-
-2. **Install project dependencies:**
-   ```bash
-   npm install
-   ```
-
-3. **Set up Environment Variables:**
-   Duplicate the provided `.env.example` file to create your local configurations:
-   ```bash
-   cp .env.example .env
-   ```
-   Open the newly created `.env` file and populate the fields with **your actual development keys and configurations**
-
-### Running the Application
-
-You can control the server lifecycle using the predefined npm scripts:
-
-* **Development Mode** (Runs with hot-reload enabled, watching for file changes):
-    ```bash
-    npm run start:dev
-    ```
-* **Debug Mode** (Runs in development with debugging capabilities):
-    ```bash
-    npm run start:debug
-    ```
-* **Production Build & Run** (Compiles TypeScript into highly optimized JavaScript code and executes it):
-    ```bash
-    npm run build
-    npm run start:prod
-    ```
-
-Once started, the API endpoints will be accessible at: `http://localhost:<PORT>/api/v1` (Default PORT defined in `.env`).
-
-## API Reference
-
-### 2. Users
-
-#### Get all users
-
-```http
-  GET /api/v1/users
+```bash
+git clone https://github.com/nghiald13/BE-NestJS
+cd nest-app
+cp .env.example .env   # fill in required environment variables
+docker compose up --build
 ```
 
-#### Update user
+The API Gateway will be available at `http://localhost:8080`.
+Kafka will be available at `localhost:9092`.
 
-```http
-  PATCH /api/v1/users
+### API Documentation
+
+Interactive Swagger docs are available at:
+
 ```
-**Required Request Body** params as below:
-
-| Parameter | Type     | Description                     |
-| :-------- | :------- | :------------------------------ |
-| `_id`      | `string` | **Required**. User's ID |
-| `name`      | `string` | **[Optional]**. User's Fullname |
-| `email`      | `string` | **[Optional]**. User's Email |
-| `password`      | `string` | **[Optional]**. User's Password |
-| `phone`      | `string` | **[Optional]**. User's Phone Number |
-| `address`      | `string` | **[Optional]**. User's Address |
-| `image`      | `string` | **[Optional]**. User's Avatar |
-| `isActive`      | `boolean` | **[Optional]**. User's Account Status |
-| `role`      | `boolean` | **[Optional]**. User's Role |
-
-#### Delete user
-
-```http
-  DELETE /api/v1/users/:_id
+http://localhost:8080/api/docs
 ```
-**Required Path Params** as below:
 
-| Parameter | Type     | Description                     |
-| :-------- | :------- | :------------------------------ |
-| `_id`      | `string` | **Required**. User's ID |
+### Local Development (per service)
+
+Each microservice can be started individually in watch mode, with dedicated debug ports:
+
+```bash
+npm run start:debug:gateway   # API Gateway   – debug port 9229
+npm run start:debug:auth      # Auth Service  – debug port 9230
+npm run start:debug:media     # Media Service – debug port 9231
+npm run start:debug:product   # Product Service – debug port 9232
+npm run start:debug:order     # Order Service   – debug port 9233
+npm run start:debug:payment   # Payment Service – debug port 9234
+```
+
+### Environment Variables
+
+Each service reads its config via `.env`.
 
 ---
 
-### 3. Authentication
+## 📌 Roadmap / Known Improvements
 
-#### Sign in
-
-```http
-  POST /api/v1/auth/signin
-```
-
-**Required Request Body** params as below:
-
-| Parameter | Type     | Description                     |
-| :-------- | :------- | :------------------------------ |
-| `email`      | `string` | **[Optional]**. User's Email |
-| `password`      | `string` | **[Optional]**. User's Password |
-
-#### Sign up
-
-```http
-  POST /api/v1/auth/signup
-```
-
-**Required Request Body** params as below:
-
-| Parameter | Type     | Description                     |
-| :-------- | :------- | :------------------------------ |
-| `name`      | `string` | **Required**. User's Fullname |
-| `email`      | `string` | **Required**. User's Email |
-| `password`      | `string` | **Required**. User's Password |
-| `phone`      | `string` | **[Optional]**. User's Phone Number |
-| `address`      | `string` | **[Optional]**. User's Address |
-| `image`      | `string` | **[Optional]**. User's Avatar |
-
-#### Verify account
-
-```http
-  POST /api/v1/auth/verify
-```
-
-**Required Request Body** params as below:
-
-| Parameter | Type     | Description                     |
-| :-------- | :------- | :------------------------------ |
-| `email`      | `string` | **Required**. User's Email |
-| `codeId`      | `string` | **Required**. OTP sent to User's email |
-
-#### Send verification email
-
-```http
-  POST /api/v1/auth/sendEmail
-```
-
-**Required Request Body** params as below:
-
-| Parameter | Type     | Description                     |
-| :-------- | :------- | :------------------------------ |
-| `email`      | `string` | **Required**. User's Email |
-
-#### Google authentication OAuth2
-
-Google Provider will return User Info to this endpoint
-
-```http
-  POST /api/v1/auth/google
-```
+- [ ] Implement Warehouse Management System (WMS) businesses.
+- [ ] Implement Dashboard for staff roles.
+- [ ] Implement Rate Limiting for crucial businesses.
+- [ ] Add centralized logging & tracing across services.
+- [ ] Keep transitioning legacy codes from previous monolithic architecture.
 
 ---
 
-### 4. Products
-#### Get all products
+## 👤 Author
 
-```http
-  GET /api/v1/products
-```
-**[Optional]** Query Params as below:
+**Lê Đại Nghĩa**
 
-| Parameter | Type     | Description                     |
-| :-------- | :------- | :------------------------------ |
-| `?kw`      | `string` | Product's name |
-| `?manufacturer`      | `string` | Product's manufacturer (1 or many) |
+## 📄 License
 
-#### Create product
-Work in progress.
-<!-- ```http
-  POST /api/v1/products
-``` -->
-
-<!-- #### Get product manufacturers metadata
-
-```http
-  GET /api/v1/products/meta/manufacturers
-``` -->
-
-#### Get product details
-
-```http
-  GET /api/v1/products/:productId
-```
-**Required Path Params** as below:
-
-| Parameter   | Type     | Description                         |
-| :---------- | :------- | :---------------------------------- |
-| `productId` | `string` | **Required**. Product's ID to see details |
-
-#### Update product
-Work in progress.
-<!-- ```http
-  PATCH /api/v1/products/${id}
-```
-
-| Parameter | Type     | Description                          |
-| :-------- | :------- | :----------------------------------- |
-| `id`      | `string` | **Required**. Id of product to update | -->
-
-#### Delete product
-Work in progress.
-<!-- ```http
-  DELETE /api/v1/products/${id}
-```
-
-| Parameter | Type     | Description                          |
-| :-------- | :------- | :----------------------------------- |
-| `id`      | `string` | **Required**. Id of product to delete | -->
-
----
-
-### 5. Payments
-
-#### Initialize payment
-
-```http
-  POST /api/v1/payment
-```
-
-#### Checkout payment
-
-```http
-  POST /api/v1/payment/checkout
-```
-
----
-
-### 6. Orders
-
-#### Get order details (invoices)
-
-```http
-  GET /api/v1/orders/:orderId
-```
-
-| Parameter | Type     | Description                        |
-| :-------- | :------- | :--------------------------------- |
-| `orderId`      | `string` | **Required**. Order's ID |
-
----
-
-### 7. Admin
-
-#### Get product statistics
-
-```http
-  GET /api/v1/admin/products/stats
-```
+This project is for personal learning/portfolio purposes (UNLICENSED).

@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, Inject, Headers, BadRequestException } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-import { CreateOrderDto } from 'apps/order-service/src/modules/orders/dto/create-order.dto';
 import { Microservice } from 'libs/enum/microservice.enum';
+import { CreateOrderDto } from 'libs/shared-modules/dto/order.dto';
 import { firstValueFrom } from 'rxjs';
 
 @Controller('order')

@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
 import { HydratedDocument, Types } from "mongoose";
-import { PaymentMethod } from "libs/enum/payment.enum";
+import { PaymentAttemptStatus, PaymentMethod } from "libs/enum/payment.enum";
 
 export type PaymentAttemptDocument = HydratedDocument<PaymentAttempt>;
 
@@ -31,7 +31,7 @@ export class PaymentAttempt {
     @Prop()
     amount: number;
 
-    @Prop()
+    @Prop({enum: PaymentAttemptStatus})
     status: string;
 }
 

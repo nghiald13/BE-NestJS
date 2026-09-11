@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import dayjs from 'dayjs';
+import { OrderStatus } from 'libs/enum/order.enum';
 import { HydratedDocument, Types } from 'mongoose';
 
 export type OrderDocument = HydratedDocument<Order>;
@@ -68,7 +69,7 @@ export class Order {
     pricing: Pricing;
 
     // Status
-    @Prop({ type: String, enum: ['PENDING_PAYMENT', 'PAID', 'FAILED', 'CANCELLED'], default: 'PENDING' })
+    @Prop({ type: String, enum: OrderStatus })
     status: string;
 
     // Expire At

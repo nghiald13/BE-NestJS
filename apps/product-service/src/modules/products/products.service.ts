@@ -1,12 +1,11 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
-import { UpdateProductDto } from './dto/update-product.dto';
-import { Product, ProductDocument } from './schemas/product.schema';
+import { BadRequestException, HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { Product } from './schemas/product.schema';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, isValidObjectId, Model, Types } from 'mongoose';
 import aqp from 'api-query-params';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { RpcException } from '@nestjs/microservices';
-import { BulkProductDto } from './dto/create-product.dto';
+import { BulkProductDto } from 'libs/shared-modules/dto/product.dto';
 
 @Injectable()
 export class ProductsService {
@@ -99,14 +98,6 @@ export class ProductsService {
     return result
   }
 
-  update(id: number, updateProductDto: UpdateProductDto) {
-    return `This action updates a #${id} product`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} product`;
-  }
-
   async getDistinctManufacturers() {
 
     const cacheKey = `product:manufacturers`
@@ -145,22 +136,27 @@ export class ProductsService {
           { $inc: { in_stock: -item.quantity } },
           { session, new: true },
         );
-        if (!updated) {
-          throw new RpcException(`Sản phẩm ${item.productId} không đủ hàng`);
-        }
+        if (!updated) throw new RpcException({
+          statusCode: HttpStatus.CONFLICT,
+          message: `Product ${item.productId} is out of required stock. Contact supporter for more information!`,
+        });
       }
       await session.commitTransaction();
       return true;
     } catch (error: any) {
       await session.abortTransaction();
-      console.log(error.message);
+      throw error;
     } finally {
       session.endSession();
     }
-    return false;
   }
 
   async refundStock(items: { productId: Types.ObjectId; quantity: number }[]) {
+    
+    if (!items) {
+      console.log(`There were no items deducted while creating order!`);
+      return;
+    }
 
     const bulkOps = items.map(item => ({
       updateOne: {

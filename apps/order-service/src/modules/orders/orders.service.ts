@@ -1,14 +1,18 @@
-import { BadRequestException, HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, isValidObjectId, Model, Types } from 'mongoose';
 import { Order } from './schema/order.schema';
-import { CreateOrderDto } from './dto/create-order.dto';
 import { ClientProxy, RpcException } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
-import { OutboxDocument, OutboxEvent } from 'apps/outbox/src/schemas/outbox.schema';
+import { OutboxDocument, OutboxEvent } from 'libs/shared-modules/outbox/src/schemas/outbox.schema';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { RedisService } from 'libs/shared-modules/redis/redis.service';
 import dayjs from 'dayjs';
+import { CreateOrderDto } from 'libs/shared-modules/dto/order.dto';
+import { PaymentStatus } from 'libs/enum/payment.enum';
+import { OrderStatus } from 'libs/enum/order.enum';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 
 @Injectable()
 export class OrdersService {
@@ -21,14 +25,17 @@ export class OrdersService {
     @InjectModel(OutboxEvent.name)
     private readonly outboxModel = Model<OutboxDocument>,
 
-    // @Inject('PAYMENT_SERVICE')
-    // private readonly paymentClient: ClientProxy,
+    @Inject('PAYMENT_SERVICE')
+    private readonly paymentClient: ClientProxy,
 
     @Inject('PRODUCT_SERVICE')
     private readonly productClient: ClientProxy,
 
     @InjectModel(Order.name)
     private orderModel = Model<Order>,
+
+    @InjectQueue('ORDER_QUEUE')
+    private readonly orderQueue: Queue,
 
     @InjectConnection()
     private readonly connection: Connection,
@@ -85,7 +92,6 @@ export class OrdersService {
       const tax = subtotal * 0.08;
       const discount = 0;
       const shipping = 0;
-
       return {
         subtotal,
         tax,
@@ -96,25 +102,34 @@ export class OrdersService {
     }
     const pricing = getPricing(items);
 
-    // Reserve Stock
-    const reserved = await firstValueFrom(this.productClient.send('product.reserve', { items: dto.items }))
-    if (!reserved) throw new RpcException(reserved.message);
-
+    let order, reserved;
     const session = await this.connection.startSession();
     await session.startTransaction();
-    let order;
     // Insert into DB
     try {
+      // Reserve Stock
+      reserved = await firstValueFrom(this.productClient.send('product.reserve', { items: dto.items }))
       order = new this.orderModel({
         userId: new Types.ObjectId(dto.userId),
         customerInfo: dto.customerInfo,
         items: items,
         pricing: pricing,
-        status: 'PENDING_PAYMENT',
-        expiresAt: dayjs().add(10, 'minutes').toDate(),
+        status: OrderStatus.PAYMENTPENDING,
+        expiresAt: dayjs().add(13, 'minutes').toDate(),
       });
-      await order.save({ session })
+      await order.save({ session });
 
+      // Add Scheduled Job: order.auto-check:${orderId}
+      await this.orderQueue.add('order.auto-Check', {
+        orderId: order._id.toString()
+      }, {
+        jobId: `order.auto-check-${order._id.toString()}`,
+        delay: dayjs(order.expiresAt).diff(dayjs()),
+        removeOnComplete: true,
+        removeOnFail: true,
+      });
+
+      // Announce event order.created
       await this.outboxModel.create([{
         topic: 'order.created',
         payload: {
@@ -127,13 +142,18 @@ export class OrdersService {
       await session.commitTransaction();
     } catch (error: any) {
       await session.abortTransaction();
-      console.log('Error while creating order! Rollback stock');
-      // Compensate stock
+      console.log('Error while creating order!');
+      // Compensate stock if deducted
+      console.log(`Rolling back ${reserved ? dto.items.length : 0} items due to deduction while creating`)
       await this.outboxModel.create({
-        topic: 'order.create.failed',
-        payload: { items: dto.items },
+        topic: `order.create.failed`,
+        payload: {
+          items: reserved ? dto.items : null
+        }
       });
-      throw new RpcException(error.message);
+      // Release cache so can try again
+      await this.redisService.release(cacheKey);
+      throw new RpcException(error);
     }
     await this.cacheManager.set(cacheKey, {
       status: 'SUCCESS',
@@ -149,9 +169,28 @@ export class OrdersService {
     }
     await this.orderModel.findOneAndUpdate({ _id: new Types.ObjectId(orderId) }, {
       $set: {
-        status: 'CONFIRMING',
+        status: OrderStatus.CONFIRMING,
       },
     })
     console.log(`Order ${orderId} has been paid`)
+  }
+
+  async autoCheck(orderId: string) {
+    const paymentStatus = await firstValueFrom(this.paymentClient.send('payment.query-status', orderId));
+    // case CANCELLED: do update status -> emit event order.cancelled
+    if (paymentStatus === PaymentStatus.CANCELLED) {
+      await this.orderModel.findOneAndUpdate({ _id: new Types.ObjectId(orderId) }, {
+        $set: {
+          status: OrderStatus.CANCELLED,
+        }
+      })
+      await this.outboxModel.create({
+        topic: 'order.cancelled',
+        payload: {},
+      })
+    } else if (paymentStatus === PaymentStatus.FINALIZING) {
+      throw new ConflictException(`Order ${orderId} has Payment finalizing. Delay the job another 2 min!`)
+    }
+
   }
 }

@@ -5,9 +5,6 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { Roles } from 'apps/api-gateway/src/decorators/decor';
 import { RolesGuard } from '../../../../api-gateway/src/passport/roles-auth.guard';
 import { Role } from '../../../../api-gateway/src/decorators/roles.enum';
-// import { Roles } from '../../decorators/decor';
-// import { Role } from '../../auth/roles.enum';
-// import { RolesGuard } from '../../auth/passport/roles-auth.guard';
 
 @Controller()
 export class UsersController {
@@ -28,11 +25,6 @@ export class UsersController {
   ) {
     return this.usersService.findAll(query, +current, +pageSize);
   }
-
-  // @Get(':id')
-  // findOne(@Param('id') id: string) {
-  //   return this.usersService.findOne(+id);
-  // }
 
   @Patch()
   async update(@Body() updateUserDto: UpdateUserDto) {

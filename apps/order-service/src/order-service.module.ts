@@ -6,16 +6,14 @@ import { CacheModule } from '@nestjs/cache-manager';
 import KeyvRedis from 'node_modules/@keyv/redis/dist/index.cjs';
 import { RedisModule } from 'libs/shared-modules/redis/redis.module';
 import { BullMQModule } from 'libs/shared-modules/bullmq/bullmq.module';
-import { ScheduleModule } from '@nestjs/schedule';
-import { OutboxModule } from 'apps/outbox/src/outbox.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    
-    
+
+
 
     MongooseModule.forRootAsync({
       inject: [ConfigService],
@@ -46,7 +44,7 @@ import { OutboxModule } from 'apps/outbox/src/outbox.module';
 
     // BullMQ Module
     BullMQModule,
-    
+
     OrdersModule,
   ],
   controllers: [],

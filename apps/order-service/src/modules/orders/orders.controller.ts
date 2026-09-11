@@ -1,8 +1,8 @@
 import { Controller } from '@nestjs/common';
 import { OrdersService } from './orders.service';
-import { MessagePattern, Payload } from '@nestjs/microservices';
-import { CreateOrderDto } from './dto/create-order.dto';
 import { KafkaEvent, TCPMessage } from 'libs/decorator/microservice-pattern.decorator';
+import { Payload } from '@nestjs/microservices';
+import { CreateOrderDto } from 'libs/shared-modules/dto/order.dto';
 
 @Controller()
 export class OrdersController {

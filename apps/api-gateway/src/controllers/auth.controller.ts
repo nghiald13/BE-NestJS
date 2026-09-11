@@ -1,13 +1,12 @@
 import { Body, Controller, Inject, Post, Res, Request, UseGuards, HttpCode, HttpStatus } from "@nestjs/common";
 import { ClientProxy } from "@nestjs/microservices";
 import { Public, ResponseMessage } from "apps/api-gateway/src/decorators/decor";
-import { CreateAuthDto } from "apps/auth-service/src/modules/auth/dto/create-auth.dto";
-import { VerifyAuthDto } from "apps/auth-service/src/modules/auth/dto/update-auth.dto";
 import { JwtAuthGuard } from "apps/api-gateway/src/passport/jwt-auth.guard";
 import { JwtRefreshGuard } from "apps/api-gateway/src/passport/jwt-refresh.guard";
 import { LocalAuthGuard } from "apps/api-gateway/src/passport/local-auth.guard";
 import { firstValueFrom } from "rxjs";
 import { Response } from "express";
+import { CreateAuthDto, VerifyAuthDto } from "libs/shared-modules/dto/auth.dto";
 
 @Controller('auth')
 export class AuthGatewayController {

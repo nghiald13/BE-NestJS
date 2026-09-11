@@ -1,11 +1,8 @@
 import { Controller } from '@nestjs/common';
 import { PaymentService } from './payment.service';
-import { CreatePaymentDto } from './dto/create-payment.dto';
-import { EventPattern, MessagePattern, Payload } from '@nestjs/microservices';
+import { MessagePattern, Payload } from '@nestjs/microservices';
 import { PaymentMethod } from '../../../../../libs/enum/payment.enum';
-import { Types } from 'mongoose';
 import { KafkaEvent } from 'libs/decorator/microservice-pattern.decorator';
-import { request } from 'http';
 
 @Controller()
 export class PaymentController {
@@ -32,10 +29,8 @@ export class PaymentController {
     return this.paymentService.zaloPayCallbackHandler({ data, mac });
   }
 
-  // @Post('checkout')
-  // @Public()
-  // @HttpCode(HttpStatus.NO_CONTENT)
-  // checkout(@Body() momoPaymentDto: MomoPaymentDto) {
-  //   return this.paymentService.verifyPayment(momoPaymentDto)
-  // }
+  @MessagePattern('payment.query-status')
+  queryStatus(@Payload() { orderId }: { orderId: string }) {
+    
+  }
 }

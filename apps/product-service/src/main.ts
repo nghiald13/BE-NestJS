@@ -39,6 +39,7 @@ async function bootstrap() {
   });
 
   await app.startAllMicroservices();
+  await app.init();
   console.log('========== PRODUCT SERVICE STARTED ==========');
 }
 bootstrap();
