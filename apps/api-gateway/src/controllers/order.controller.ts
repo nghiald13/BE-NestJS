@@ -1,8 +1,9 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Inject, Headers, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Inject, Headers, BadRequestException, UseGuards } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { Microservice } from 'libs/enum/microservice.enum';
 import { CreateOrderDto } from 'libs/shared-modules/dto/order.dto';
 import { firstValueFrom } from 'rxjs';
+import { CurrentUser } from '../decorators/decor';
 
 @Controller('order')
 export class OrderGatewayController {
@@ -12,9 +13,9 @@ export class OrderGatewayController {
     ) { }
 
     // ======================== STATIC ROUTES ========================
-    @Post('findByUserId')
-    findByUserId(@Body() createOrderDto: CreateOrderDto) {
-        return this.orderClient.send('order.findByUserId', createOrderDto.userId);
+    @Get()
+    findByUserId(@CurrentUser('sub') userId: string) {
+        return this.orderClient.send('order.findByUserId', userId);
     }
 
     @Post('create')

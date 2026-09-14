@@ -8,7 +8,16 @@
       "mailer/templates/**/*"
     ],
     "webpack": true,
-    "tsConfigPath": "apps/nest-app/tsconfig.app.json"
+    "tsConfigPath": "apps/nest-app/tsconfig.app.json",
+    "plugins": [
+      {
+        "name": "@nestjs/swagger",
+        "options": {
+          "classValidatorShim": true,
+          "introspectComments": true
+        }
+      }
+    ]
   },
   "watchAssets": true,
   "monorepo": true,

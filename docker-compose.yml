@@ -1,4 +1,36 @@
 services:
+  # ============================== Infrastructure ==============================
+  # ===== REDIS =====
+  redis:
+    image: redis:latest
+    container_name: redis
+    restart: always
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - app-network
+
+  # ===== REDIS INSIGHT ===== (optional)
+  redis-insight:
+    image: redis/redisinsight:latest
+    container_name: redis-insight
+    restart: always
+    ports:
+      - "5540:5540"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - app-network
+
   # ===== KAFKA =====
   kafka:
     image: apache/kafka:latest
@@ -27,6 +59,23 @@ services:
     networks:
       - app-network
 
+  # ===== KAFKA UI ===== (optional)
+  kafka-ui:
+    container_name: kafka-ui
+    image: ghcr.io/kafbat/kafka-ui:latest
+    ports:
+      - "9090:9090"
+    environment:
+      SERVER_PORT: 9090
+      KAFKA_CLUSTERS_0_NAME: local-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  # ============================== App Services ==============================
   # ===== API Gateway =====
   api-gateway:
     build:
@@ -165,3 +214,6 @@ networks:
 
 volumes:
   kafka_data:
+
+  redis_data:
+    driver: local

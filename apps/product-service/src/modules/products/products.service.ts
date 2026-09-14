@@ -120,7 +120,7 @@ export class ProductsService {
   async getProducts(productId: string[]) {
     const products = await this.productModel
       .find({ _id: { $in: productId } })
-      .select('name price')
+      .select('name price image')
       .lean()
 
     return products

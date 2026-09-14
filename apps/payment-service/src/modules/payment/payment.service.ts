@@ -116,7 +116,7 @@ export class PaymentService {
     await this.paymentQueue.add('payment.finalizing', {
       paymentId: payment._id.toString(),
     }, {
-      jobId: `payment.finalizing:${payment._id.toString()}`,
+      jobId: `payment.finalizing-${payment._id.toString()}`,
       delay: dayjs(payment.expiresAt).diff(dayjs()),
       removeOnComplete: true,
       removeOnFail: true,
@@ -236,6 +236,7 @@ export class PaymentService {
     const app_trans_id = `${dayjs().format('YYMMDD')}_${order._id}_${dayjs().format('HHmmss')}`
     const embed_data = {
       // redirect_url: `${process.env.FRONT_END_BASE_URL}${process.env.FRONT_END_CHECKOUT}`
+      redirecturl: `http://localhost:3000/checkout`
     }
 
     // Initialize request body
@@ -352,12 +353,16 @@ export class PaymentService {
       status: PaymentAttemptStatus.PROCESSING,
     }) > 0;
 
-    // If any attempts processing, update status
+    let status = PaymentStatus.CANCELLED;
+    // If any attempts processing, change status
     if (processingAttempts) {
-      const updated = await this.paymentModel.findOneAndUpdate({ _id: new Types.ObjectId(paymentId) }, {
-        $set: { status: PaymentStatus.FINALIZING }
-      })
+      status = PaymentStatus.FINALIZING
     }
+
+    // Else, all attempts are failed (paid case was updated only through zalopay callback), cancel by default
+    await this.paymentModel.findOneAndUpdate({ _id: new Types.ObjectId(paymentId) }, {
+      $set: { status: status }
+    });
   }
 
   // Query Order status as Scheduled job

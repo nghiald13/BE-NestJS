@@ -52,9 +52,19 @@ export class OrdersService {
   }
 
   async findByUserId(userId: string) {
-    const result = await this.orderModel.find({
-      userId: userId
-    }).sort("-createdAt")
+    const result = await this.orderModel.aggregate([
+      { $match: { userId: new Types.ObjectId(userId) } },
+      {
+        $project: {
+          amount: "$pricing.total",
+          status: 1,
+          items: 1,
+          createdAt: 1,
+          expiresAt: 1,
+        }
+      },
+      { $sort: { createdAt: -1 } },
+    ])
 
     return result
   }
@@ -81,6 +91,7 @@ export class OrdersService {
       const product = orderItems.find(p => p._id.toString() === item.productId);
       return {
         productId: new Types.ObjectId(product._id),
+        image: product.image,
         name: product.name,
         price: product.price,
         quantity: item.quantity,
