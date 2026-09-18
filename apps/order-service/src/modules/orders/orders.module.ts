@@ -10,6 +10,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { OutboxModule } from 'libs/shared-modules/outbox/src/outbox.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { OrderProcessor } from './orders.processor';
 
 @Module({
   imports: [
@@ -54,11 +55,6 @@ import { ScheduleModule } from '@nestjs/schedule';
 
   ],
   controllers: [OrdersController],
-  providers: [OrdersService],
-  exports: [
-    MongooseModule,
-    OrdersService,
-    // OrderProcessor,
-  ]
+  providers: [OrdersService, OrderProcessor,],
 })
 export class OrdersModule { }

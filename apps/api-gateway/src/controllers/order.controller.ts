@@ -1,8 +1,9 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Inject, Headers, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Inject, Headers, BadRequestException, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { Microservice } from 'libs/enum/microservice.enum';
-import { CreateOrderDto } from 'libs/shared-modules/dto/order.dto';
+import { CancelOrderDto, CreateOrderDto } from 'libs/shared-modules/dto/order.dto';
 import { firstValueFrom } from 'rxjs';
+import { CurrentUser, ResponseMessage } from '../decorators/decor';
 
 @Controller('order')
 export class OrderGatewayController {
@@ -12,9 +13,9 @@ export class OrderGatewayController {
     ) { }
 
     // ======================== STATIC ROUTES ========================
-    @Post('findByUserId')
-    findByUserId(@Body() createOrderDto: CreateOrderDto) {
-        return this.orderClient.send('order.findByUserId', createOrderDto.userId);
+    @Get()
+    findByUserId(@CurrentUser('sub') userId: string) {
+        return this.orderClient.send('order.findByUserId', userId);
     }
 
     @Post('create')
@@ -24,6 +25,17 @@ export class OrderGatewayController {
             idempotencyKey,
             dto,
         }));
+    }
+
+    @Patch('cancel')
+    @ResponseMessage('Order cancelled')
+    @HttpCode(HttpStatus.NO_CONTENT)
+    cancel(
+        @Headers('X-Idempotency-Key') idempotencyKey: string,
+        @Body() dto: CancelOrderDto, @CurrentUser('sub') userId: string
+    ) {
+        if (!idempotencyKey) throw new BadRequestException('X-Idempotency-Key header is required!')
+        return firstValueFrom(this.orderClient.send('order.cancel', { idempotencyKey, dto, userId }));
     }
 
     // ======================== DYNAMIC ROUTES ========================

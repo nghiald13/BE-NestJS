@@ -3,6 +3,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { Job } from "bullmq";
 import { Types } from "mongoose";
 import { PaymentService } from "./payment.service";
+import { ZaloPayService } from "./zalopay.service";
 
 @Injectable()
 @Processor('PAYMENT_QUEUE')
@@ -11,6 +12,7 @@ export class PaymentProcessor extends WorkerHost {
 
     constructor(
         private readonly paymentService: PaymentService,
+        private readonly zaloPayService: ZaloPayService,
     ) { super(); }
 
     process(job: Job, token?: string): Promise<any> {
@@ -19,6 +21,8 @@ export class PaymentProcessor extends WorkerHost {
                 return this.checkPaymentAttemptStatus(job.data);
             case 'payment.finalizing':
                 return this.paymentFinalizing(job.data);
+            case 'refundAttempt.auto-check':
+                return this.refundAttemptReconcile(job.data);
             default:
                 this.logger.warn(`Không tìm thấy Handler cho Job: ${job.name}`);
                 break;
@@ -29,11 +33,15 @@ export class PaymentProcessor extends WorkerHost {
 
     // Auto methods
     private checkPaymentAttemptStatus({ paymentAttemptId }: { paymentAttemptId: Types.ObjectId }) {
-        return this.paymentService.zaloPayQuery(paymentAttemptId.toString());
+        return this.zaloPayService.zaloPayQuery(paymentAttemptId.toString());
     }
 
-    private paymentFinalizing({paymentId}: {paymentId: string}) {
+    private paymentFinalizing({ paymentId }: { paymentId: string }) {
         return this.paymentService.paymentFinalizing(paymentId);
+    }
+
+    private refundAttemptReconcile({ queryCode }: { queryCode: string }) {
+        return this.paymentService.reconcileRefundAttempt(queryCode);
     }
 
 }

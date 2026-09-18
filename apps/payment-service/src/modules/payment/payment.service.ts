@@ -1,25 +1,23 @@
-import { BadRequestException, HttpStatus, Injectable } from '@nestjs/common';
-import { firstValueFrom } from 'rxjs';
-import { HttpService } from '@nestjs/axios';
-import queryString from 'query-string';
+import { BadRequestException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, isValidObjectId, Model } from 'mongoose';
 import { RpcException } from '@nestjs/microservices';
 import { Payment } from './schema/payment.schema';
-import { PaymentAttemptStatus, PaymentMethod, PaymentStatus } from '../../../../../libs/enum/payment.enum';
+import { PaymentAttemptStatus, PaymentMethod, PaymentStatus, RefundAttemptStatus } from '../../../../../libs/enum/payment.enum';
 import { Types } from 'mongoose';
-import { PaymentAttempt } from './schema/payment_attempt.schema';
+import { PaymentAttempt, PaymentAttemptDocument } from './schema/payment_attempt.schema';
 import dayjs, { } from "dayjs";
-import { OutboxDocument, OutboxEvent } from 'libs/shared-modules/outbox/src/schemas/outbox.schema';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { hmacsha256 } from 'libs/hash/hash.algorithm';
+import { ZaloPayService } from './zalopay.service';
+import { RefundAttempt } from './schema/refund_attempt.schema';
 
 @Injectable()
 export class PaymentService {
-  // Inject HttpService vào trong class
+  private readonly logger: Logger;
+
   constructor(
-    private readonly httpService: HttpService,
+    private readonly zaloPayService: ZaloPayService,
 
     @InjectModel(Payment.name)
     private readonly paymentModel: Model<Payment>,
@@ -27,11 +25,11 @@ export class PaymentService {
     @InjectModel(PaymentAttempt.name)
     private readonly paymentAttemptModel: Model<PaymentAttempt>,
 
+    @InjectModel(RefundAttempt.name)
+    private readonly refundAttemptModel: Model<RefundAttempt>,
+
     @InjectConnection()
     private readonly connection: Connection,
-
-    @InjectModel(OutboxEvent.name)
-    private readonly outboxModel = Model<OutboxDocument>,
 
     @InjectQueue('PAYMENT_QUEUE')
     private readonly paymentQueue: Queue,
@@ -116,7 +114,7 @@ export class PaymentService {
     await this.paymentQueue.add('payment.finalizing', {
       paymentId: payment._id.toString(),
     }, {
-      jobId: `payment.finalizing:${payment._id.toString()}`,
+      jobId: `payment.finalizing-${payment._id.toString()}`,
       delay: dayjs(payment.expiresAt).diff(dayjs()),
       removeOnComplete: true,
       removeOnFail: true,
@@ -171,177 +169,16 @@ export class PaymentService {
   }
 
   private cod() {
-
+    return null;
   }
 
   private getPayUrlByPaymentMethod(method: PaymentMethod, order: { _id: string, amount: number }) {
     switch (method) {
-      case PaymentMethod.MOMO:
-        return this.getMoMoPayUrl(order);
       case PaymentMethod.ZALOPAY:
-        return this.getZaloPayUrl(order);
+        return this.zaloPayService.getZaloPayUrl(order);
+      default:
+        return this.cod();
     }
-  }
-
-  private async getMoMoPayUrl(order: { _id: string, amount: number }) {
-    const endpoint = process.env.MOMO_TEST_ENV_URL
-    const momoPartnerCode = process.env.MOMO_PARTNER_CODE
-    const momoAccessKey = process.env.MOMO_ACCESS_KEY
-    const momoSecretKey = process.env.MOMO_SECRET_KEY
-    const requestId = `REQ_${Date.now()}`
-
-    const requestBody = {
-      accessKey: momoAccessKey,
-      amount: order.amount,
-      extraData: "",
-      ipnUrl: `${process.env.BACK_END_BASE_URL}/api/v1/payment/checkout`,
-      orderId: order._id,
-      orderInfo: `Thanh toan don ${order._id}`,
-      partnerCode: momoPartnerCode,
-      redirectUrl: `${process.env.FRONT_END_BASE_URL}${process.env.FRONT_END_CHECKOUT}`,
-      requestId: requestId,
-      requestType: "captureWallet"
-    }
-
-    const signature = hmacsha256(queryString.stringify(requestBody, { encode: false }), momoSecretKey)
-    const response = await firstValueFrom(
-      this.httpService.post(endpoint, {
-        ...requestBody,
-        signature: signature,
-        // optional MoMo props
-        // items: dto.items
-      },
-        { headers: { 'Content-Type': 'application/json; charset=UTF-8' }, }
-      )
-    );
-
-    const momoResult = response.data;
-    if (!momoResult || !momoResult?.payUrl)
-      throw new RpcException('Error while fetching MOMO API. Try again later!')
-
-    return {
-      queryCode: order._id,
-      payUrl: momoResult.payUrl,
-      payUrlExpiresAt: new Date(Date.now() + 15 * 60 * 1000), // expires in 15 minutes
-    }
-  }
-
-  private async getZaloPayUrl(order: { _id: string, amount: number }) {
-    const APP_ID = +process.env.ZP_APP_ID;
-    const KEY1 = process.env.ZP_KEY1;
-    const endpoint = process.env.ZP_API_CREATEORDER;
-
-    // Preprocessing request body
-    const app_time = Date.now();
-    const app_trans_id = `${dayjs().format('YYMMDD')}_${order._id}_${dayjs().format('HHmmss')}`
-    const embed_data = {
-      // redirect_url: `${process.env.FRONT_END_BASE_URL}${process.env.FRONT_END_CHECKOUT}`
-    }
-
-    // Initialize request body
-    const requestBody = {
-      app_id: APP_ID,
-      app_user: "Test Payment",
-      app_trans_id: app_trans_id,
-      app_time: app_time,
-      expire_duration_seconds: 300,
-      amount: order.amount,
-      item: JSON.stringify([]),
-      description: `Payment for Order ${app_trans_id}`,
-      embed_data: JSON.stringify(embed_data),
-      callback_url: `${process.env.NGROK_HOOK}/api/v1/payment/zalo/callback`,
-      // bank_code: '',
-    }
-
-    // sign mac with sha256
-    const hmac_input = `${requestBody.app_id}|${requestBody.app_trans_id}|${requestBody.app_user}|${requestBody.amount}|${requestBody.app_time}|${requestBody.embed_data}|${requestBody.item}`;
-    const mac = hmacsha256(hmac_input, KEY1);
-
-    // fetch zalopay api with {requestBody, mac}
-    const response = await firstValueFrom(
-      this.httpService.post(endpoint, {
-        ...requestBody,
-        mac: mac,
-      }, {
-        headers: { 'Content-Type': 'application/json' },
-      }));
-
-    // errors handling
-    const result = response.data;
-    if (!result) {
-      throw new RpcException('Error while fetching API!')
-    }
-    if (result.return_code !== 1) {
-      throw new RpcException('Error while getting payUrl link!')
-    }
-
-    // success
-    return {
-      queryCode: app_trans_id,
-      payUrl: result.order_url,
-      payUrlExpiresAt: dayjs().add(5, 'minute').toDate(),
-    };
-  }
-
-  // ZaloPay Callback Handler ONLY FOR SUCCESS
-  async zaloPayCallbackHandler({ data, mac }: { data: string, mac: string }) {
-    // Revalidate MAC
-    const mac_check = hmacsha256(data, process.env.ZP_KEY2);
-    if (mac !== mac_check) {
-      console.log("Invalid mac!")
-      return
-    }
-
-    const response = JSON.parse(data);
-    // Prepare result to response ZaloPayCallback, default success
-    let result = {
-      return_code: 1,
-      return_message: 'Payment confirmed'
-    }
-
-    // Update payment
-    const queryCode: string = response.app_trans_id
-
-
-    const session = await this.connection.startSession();
-    await session.startTransaction();
-    try {
-      // Find attempt and update attempt
-      const paymentAttempt = await this.paymentAttemptModel.findOneAndUpdate({ queryCode }, {
-        $set: {
-          transactionId: response.zp_trans_id.toString(),
-          payDate: dayjs(response.server_time).toDate(),
-          status: 'SUCCESS',
-        },
-      }, { session });
-
-      // Find corresponding Payment and update its status
-      const payment = await this.paymentModel.findOneAndUpdate({ _id: paymentAttempt.paymentId }, {
-        $inc: { remaining: -response.amount },
-        $set: { status: 'PAID' },
-      }, { session });
-
-      // Delete delayed job autocheck paymentAttemptId
-      await this.paymentQueue.remove(`paymentAttempt.auto-check.attempt-${paymentAttempt._id.toString()}`);
-      // Delete scheduled job: paymenmt.finalizing:${paymentId}
-
-      // emit event payment.success to consumers
-      await this.outboxModel.create([{
-        topic: 'payment.success',
-        payload: { orderId: payment.orderId.toString() },
-      }], { session });
-
-      await session.commitTransaction();
-    } catch (error: any) {
-      await session.abortTransaction();
-      console.log(`Error while updating Payment! Detail: ${error.message}`)
-      result = {
-        return_code: 0,
-        return_message: 'Try callback'
-      }
-    }
-    await session.endSession();
-    return result;
   }
 
   // Scheduled Job: Payment Finalizing (trigger when payment expiresAt hits)
@@ -352,77 +189,124 @@ export class PaymentService {
       status: PaymentAttemptStatus.PROCESSING,
     }) > 0;
 
-    // If any attempts processing, update status
+    let status = PaymentStatus.CANCELLED;
+    // If any attempts processing, change status
     if (processingAttempts) {
-      const updated = await this.paymentModel.findOneAndUpdate({ _id: new Types.ObjectId(paymentId) }, {
-        $set: { status: PaymentStatus.FINALIZING }
-      })
+      status = PaymentStatus.FINALIZING
+    }
+
+    // Else, all attempts are failed (paid case was updated only through zalopay callback), cancel by default
+    await this.paymentModel.findOneAndUpdate({ _id: new Types.ObjectId(paymentId) }, {
+      $set: { status: status }
+    });
+  }
+
+  async cancel(orderId: string) {
+    const payment = await this.paymentModel.findOne({ orderId: new Types.ObjectId(orderId) });
+    if (!payment) return;
+    const paymentAttempts = await this.paymentAttemptModel.find({
+      paymentId: payment._id,
+      status: PaymentAttemptStatus.SUCCESS,
+    });
+    await this.paymentModel.updateOne({ _id: payment._id }, {
+      $set: { status: PaymentStatus.CANCELLED }
+    });
+    if (paymentAttempts) {
+      // For every success Payment Attempt -> Refund
+      for (const attempt of paymentAttempts) {
+        await this.refund(attempt);
+      }
     }
   }
 
-  // Query Order status as Scheduled job
-  async zaloPayQuery(paymentAttemptId: string) {
-    const paymentAttempt = await this.paymentAttemptModel.findOne({ _id: paymentAttemptId });
-    if (!paymentAttempt) return;
-    const payment = await this.paymentModel.findOne({ _id: paymentAttempt.paymentId });
-    if (!payment) return;
+  async refund(paymentAttempt: PaymentAttemptDocument) {
+    // Idempotency
+    const existing = await this.refundAttemptModel.findOne({
+      paymentAttemptId: paymentAttempt._id,
+      status: { $in: [RefundAttemptStatus.SUCCESS, RefundAttemptStatus.PROCESSING, RefundAttemptStatus.REQUESTED_REFUND] },
+    });
+    if (existing) return;
 
-    const key1 = process.env.ZP_KEY1;
-    const endpoint = process.env.ZP_API_QUERYORDER;
-    const app_id = process.env.ZP_APP_ID;
-    const app_trans_id = paymentAttempt.queryCode;
-    const hmac_input = `${app_id}|${app_trans_id}|${key1}`
-    const mac = hmacsha256(hmac_input, key1);
-
-    // query real status from ZaloPay
-    const response = await firstValueFrom(
-      this.httpService.post(endpoint, {
-        app_id,
-        app_trans_id,
-        mac,
+    // Create Refund Attempt with basic info
+    const refundAttempt = await this.refundAttemptModel.create({
+      paymentAttemptId: paymentAttempt._id,
+      amount: paymentAttempt.amount,
+      status: RefundAttemptStatus.REQUESTED_REFUND,
+    });
+    let status = RefundAttemptStatus.PROCESSING;
+    let result;
+    try {
+      // Request Refund Attempt to ZaloPay API, return attempt result
+      result = await this.zaloPayService.requestZaloPayRefund({
+        paymentAttemptId: paymentAttempt._id.toString(),
+        transactionId: paymentAttempt.transactionId,
+        amount: paymentAttempt.amount,
+      }); // might throw InternalServerException
+    } catch (error: any) {
+      // Case Server Error -> Schedule Retry
+      await this.refundAttemptModel.updateOne({ _id: refundAttempt._id }, {
+        $set: { status: RefundAttemptStatus.PROCESSING }
+      });
+      await this.paymentQueue.add('refundAttempt.auto-check', {
+        refundAttemptId: refundAttempt._id.toString(),
       }, {
-        headers: { 'Content-Type': 'application/json' }
-      })
-    )
-
-    const result = response.data;
-    if (!result) {
-      console.log(`Auto check PaymentAttempt ${paymentAttempt._id.toString()} failed`);
+        jobId: `refundAttempt.auto-check-${refundAttempt._id.toString()}`,
+        delay: 30_000,
+        removeOnComplete: true,
+        removeOnFail: true,
+      });
       return;
     }
 
-    const session = await this.connection.startSession();
-    await session.startTransaction();
-
-    const { return_code, return_message, sub_return_code, sub_return_message, zp_trans_id, server_time, amount } = result;
-    try {
-      const updated = await this.paymentAttemptModel.updateOne({ _id: paymentAttempt._id }, {
-        $set: {
-          transactionId: zp_trans_id,
-          payDate: server_time,
-          status:
-            return_code === 1 ? PaymentAttemptStatus.SUCCESS :
-              return_code === 3 ? PaymentAttemptStatus.PROCESSING :
-                PaymentAttemptStatus.FAILED,
-        }
-      }, { session });
-      if (!updated) throw new Error(`Error while updating PaymentAttempt ${paymentAttempt._id}!`);
-      if (return_code === 1) {
-        await this.paymentModel.updateOne({ _id: paymentAttempt.paymentId }, {
-          $inc: { amount: -amount },
-          $set: { status: PaymentStatus.PAID },
-        }, { session })
-      } else if (return_code === 2 && payment.status === PaymentStatus.FINALIZING) {
-        await this.paymentModel.updateOne({ _id: paymentAttempt.paymentId }, {
-          $set: { status: PaymentStatus.CANCELLED }
-        }, { session })
+    const { queryCode, refund_id } = result;
+    // Update Refund Attempt regardless result
+    await this.refundAttemptModel.updateOne({ _id: refundAttempt._id }, {
+      $set: {
+        queryCode,
+        transactionId: refund_id,
+        status,
       }
-      await session.commitTransaction();
+    });
+
+    // Create BullMQ delayed job to reconcile refund attempt status after 30-60 sec
+    await this.paymentQueue.add(`refundAttempt.auto-check`, {
+      refundAtemptId: refundAttempt._id.toString(),
+    }, {
+      jobId: `refundAttempt.auto-check-${refundAttempt._id.toString()}`,
+      delay: dayjs(dayjs().add(30, 's')).diff(dayjs()),
+      removeOnComplete: true,
+      removeOnFail: true,
+    })
+  }
+
+  async reconcileRefundAttempt(refundAttemptId: string) {
+    const refundAttempt = await this.refundAttemptModel.findOne({_id: refundAttemptId});
+
+    // Idempotency
+    if (refundAttempt.status === RefundAttemptStatus.SUCCESS) return;
+
+    let refundResult;
+    try {
+      refundResult = await this.zaloPayService.queryZaloPayRefund(refundAttempt.queryCode); // might throw Exception
     } catch (error: any) {
-      await session.abortTransaction();
-      console.log(error);
-    } finally {
-      await session.endSession();
+      this.logger.fatal(`Failed to query refund, trace: ${error.message}`);
     }
+    
+    const {return_code} = refundResult;
+    let status = RefundAttemptStatus.PROCESSING;
+    if (return_code === 1) {
+      status = RefundAttemptStatus.SUCCESS;
+    } else if (return_code === 2) {
+      status = RefundAttemptStatus.FAILED;
+    } else {
+      // Delay job
+    }
+
+    await this.refundAttemptModel.findOneAndUpdate({_id: refundAttempt._id}, {
+      $set: {
+        status,
+      }
+    });
+    this.logger.log(`Reconcile Refund Attempt "${refundAttemptId}" status: ${status}, updated Database`);
   }
 }

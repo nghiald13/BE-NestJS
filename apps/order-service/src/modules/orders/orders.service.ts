@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, isValidObjectId, Model, Types } from 'mongoose';
 import { Order } from './schema/order.schema';
@@ -16,6 +16,8 @@ import { Queue } from 'bullmq';
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     private readonly redisService: RedisService,
 
@@ -52,9 +54,19 @@ export class OrdersService {
   }
 
   async findByUserId(userId: string) {
-    const result = await this.orderModel.find({
-      userId: userId
-    }).sort("-createdAt")
+    const result = await this.orderModel.aggregate([
+      { $match: { userId: new Types.ObjectId(userId) } },
+      {
+        $project: {
+          amount: "$pricing.total",
+          status: 1,
+          items: 1,
+          createdAt: 1,
+          expiresAt: 1,
+        }
+      },
+      { $sort: { createdAt: -1 } },
+    ])
 
     return result
   }
@@ -81,6 +93,7 @@ export class OrdersService {
       const product = orderItems.find(p => p._id.toString() === item.productId);
       return {
         productId: new Types.ObjectId(product._id),
+        image: product.image,
         name: product.name,
         price: product.price,
         quantity: item.quantity,
@@ -120,7 +133,7 @@ export class OrdersService {
       await order.save({ session });
 
       // Add Scheduled Job: order.auto-check:${orderId}
-      await this.orderQueue.add('order.auto-Check', {
+      await this.orderQueue.add('order.auto-check', {
         orderId: order._id.toString()
       }, {
         jobId: `order.auto-check-${order._id.toString()}`,
@@ -162,6 +175,71 @@ export class OrdersService {
     return order._id;
   }
 
+  async cancel({ idempotencyKey, orderId, userId }: { idempotencyKey: string, orderId: string, userId: string }) {
+
+    const cacheKey = `order:cancel:${idempotencyKey}`
+    const cacheValue: { status: string } = await this.cacheManager.get(cacheKey);
+    if (cacheValue?.status) return cacheValue.status;
+    const cacheable = await this.redisService.setNLock(cacheKey, { status: 'PROCESSING' }, 30 * 1000);
+    if (!cacheable) return new RpcException({
+      statusCode: HttpStatus.CONFLICT,
+      message: "Request Cancel Order is being processed. Please wait!",
+    });
+
+    // Get corresponding Order
+    const [order] = await this.orderModel.aggregate([
+      { $match: { _id: new Types.ObjectId(orderId), userId: new Types.ObjectId(userId) } },
+      {
+        $project: {
+          _id: 1,
+          "items.productId": 1,
+          "items.quantity": 1,
+          status: 1,
+        }
+      }
+    ]);
+    if (!order) throw new RpcException({
+      statusCode: HttpStatus.NOT_FOUND,
+      message: "Order not found!"
+    })
+
+    // Allow only Unconfirmed Order (included payment pending)
+    const { status } = order;
+    const unconfirmedStatus = [
+      OrderStatus.PAYMENTPENDING,
+      OrderStatus.CONFIRMING
+    ];
+    if (!unconfirmedStatus.includes(status)) throw new RpcException({
+      statusCode: HttpStatus.FORBIDDEN,
+      message: "Current Order status does not allow to cancel!!",
+    })
+
+    // Cancel Order business
+    const session = await this.connection.startSession();
+    await session.startTransaction();
+    try {
+      // Update Order status
+      await this.orderModel.updateOne({ _id: order._id }, {
+        $set: { status: OrderStatus.CANCELLED }
+      }, { session });
+
+      // Emit event order.cancelled
+      await this.outboxModel.create([{
+        topic: 'order.cancelled',
+        payload: {
+          orderId: order._id,
+          items: order.items,
+        }
+      }], { session });
+
+      await session.commitTransaction();
+    } catch (error: any) {
+      await session.abortTransaction();
+      this.logger.log(`There was an error while cancelling order ${order._id}, trace: ${error}`);
+      throw new RpcException(error);
+    }
+  }
+
   async paymentSuccessHandler({ orderId }: { orderId: string }) {
     if (!isValidObjectId(orderId)) {
       console.log('Invalod Order Id Format!')
@@ -184,9 +262,14 @@ export class OrdersService {
           status: OrderStatus.CANCELLED,
         }
       })
+      const { items } = await this.orderModel
+        .findById(new Types.ObjectId(orderId))
+        .select("items")
       await this.outboxModel.create({
         topic: 'order.cancelled',
-        payload: {},
+        payload: {
+          items
+        },
       })
     } else if (paymentStatus === PaymentStatus.FINALIZING) {
       throw new ConflictException(`Order ${orderId} has Payment finalizing. Delay the job another 2 min!`)

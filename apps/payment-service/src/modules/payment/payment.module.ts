@@ -12,6 +12,8 @@ import { PaymentAttempt, PaymentAttemptSchema } from './schema/payment_attempt.s
 import { OutboxModule } from 'libs/shared-modules/outbox/src/outbox.module';
 import { BullModule } from '@nestjs/bullmq';
 import { PaymentProcessor } from './payment.processor';
+import { ZaloPayService } from './zalopay.service';
+import { RefundAttempt, RefundAttemptSchema } from './schema/refund_attempt.schema';
 
 
 @Module({
@@ -20,6 +22,7 @@ import { PaymentProcessor } from './payment.processor';
     MongooseModule.forFeature([
       { name: Payment.name, schema: PaymentSchema },
       { name: PaymentAttempt.name, schema: PaymentAttemptSchema },
+      { name: RefundAttempt.name, schema: RefundAttemptSchema }
     ]),
     registerMicroserviceClients([
       Microservice.ORDER_SERVICE,
@@ -53,6 +56,7 @@ import { PaymentProcessor } from './payment.processor';
   providers: [
     PaymentService,
     PaymentProcessor,
+    ZaloPayService,
   ],
 })
 export class PaymentModule { }
