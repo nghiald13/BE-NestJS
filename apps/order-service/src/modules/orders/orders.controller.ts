@@ -2,7 +2,7 @@ import { Controller } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { KafkaEvent, TCPMessage } from 'libs/decorator/microservice-pattern.decorator';
 import { Payload } from '@nestjs/microservices';
-import { CreateOrderDto } from 'libs/shared-modules/dto/order.dto';
+import { CancelOrderDto, CreateOrderDto } from 'libs/shared-modules/dto/order.dto';
 
 @Controller()
 export class OrdersController {
@@ -23,6 +23,16 @@ export class OrdersController {
     return this.ordersService.create({ idempotencyKey, dto });
   }
 
+  @TCPMessage('order.cancel')
+  cancel(@Payload() {idempotencyKey, dto, userId}: {idempotencyKey: string, dto: CancelOrderDto, userId: string}) {
+    return this.ordersService.cancel({
+      idempotencyKey,
+      orderId: dto.orderId,
+      userId,
+    });
+  }
+
+  // ===================== Events from Payment =====================
   @KafkaEvent('payment.success')
   paymentSuccessHandler(@Payload() { orderId }: { orderId: string }) {
     return this.ordersService.paymentSuccessHandler({orderId});

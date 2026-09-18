@@ -12,11 +12,11 @@ export class OrderProcessor extends WorkerHost {
         private readonly ordersService: OrdersService,
     ) { super(); }
 
-    process(job: Job, token?: string): Promise<any> {
+    async process(job: Job, token?: string): Promise<any> {
         switch (job.name) {
             case 'order.auto-check':
                 try {
-                    return this.autoCheck(job.data);
+                    return await this.autoCheck(job.data);
                 } catch (error: any) {
                     if (error instanceof ConflictException) {
                         this.logger.log(error.message);

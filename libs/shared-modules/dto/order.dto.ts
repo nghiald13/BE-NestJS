@@ -60,3 +60,8 @@ export class CreateOrderDto {
     @IsNotEmpty()
     payMethod: PaymentMethod;
 }
+
+export class CancelOrderDto {
+    @IsMongoId()
+    orderId: string;
+}
